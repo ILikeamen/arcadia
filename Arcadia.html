@@ -1,0 +1,3632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcadia v1.2 — Multi-System Emulator &amp; Game Hub</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter, Space Grotesk, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Space Grotesk', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      background-color: #f8fafc;
+      background-image:
+        radial-gradient(at 12% 0%, rgba(37, 99, 235, 0.09) 0px, transparent 52%),
+        radial-gradient(at 88% 4%, rgba(220, 38, 38, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(59, 130, 246, 0.05) 0px, transparent 55%);
+      background-attachment: fixed;
+    }
+    .arcadia-glass {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(203, 213, 225, 0.75);
+      box-shadow: 0 8px 30px -12px rgba(15, 23, 42, 0.08);
+    }
+    .arcadia-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid rgba(203, 213, 225, 0.85);
+      box-shadow: 0 4px 18px -6px rgba(15, 23, 42, 0.06);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .arcadia-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(37, 99, 235, 0.45);
+      box-shadow: 0 14px 30px -10px rgba(37, 99, 235, 0.16), 0 6px 16px -8px rgba(220, 38, 38, 0.10);
+    }
+    .arcadia-btn-primary {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #dc2626 100%);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+      transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    }
+    .arcadia-btn-primary:hover {
+      filter: brightness(1.06);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.36);
+    }
+    .arcadia-btn-red {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
+      transition: filter 0.2s ease, box-shadow 0.2s ease;
+    }
+    .arcadia-btn-red:hover {
+      filter: brightness(1.06);
+    }
+    /* Fullscreen Auto-Hiding HUD */
+    #player-view.is-fullscreen #player-topbar {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(0);
+      width: min(96vw, 1080px);
+      border-radius: 16px;
+      border: 1px solid rgba(203, 213, 225, 0.85);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.45);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    #player-view.is-fullscreen.hud-hidden #player-topbar {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(-130%);
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2563eb;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- =====================================================================
+       EMBEDDED ARCADIA HUB BUNDLE DATA
+       ===================================================================== -->
+  <script id="prism-hub-bundle" type="application/json">
+  {
+    "version": "1.2",
+    "hubTitle": "Arcadia",
+    "keepUnusedCoresOnExport": true,
+    "autosaveIntervalSec": 45,
+    "sharedAssets": {},
+    "games": [],
+    "saves": {},
+    "cheats": {}
+  }
+  </script>
+
+  <!-- =====================================================================
+       COMPILED & SECTIONED GAME MODULES CONTAINER (DOM SECTIONS)
+       ===================================================================== -->
+  <div id="prism-compiled-sections-root" class="hidden" aria-hidden="true">
+    <section id="prism-shared-engine-section" data-section-type="shared-vfs-pool"></section>
+    <section id="prism-games-registry-section" data-section-type="recompiled-game-modules"></section>
+  </div>
+
+  <!-- =====================================================================
+       GLOBAL DRAG & DROP OVERLAY
+       ===================================================================== -->
+  <div id="drop-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 transition-opacity">
+    <div class="max-w-xl w-full border-2 border-dashed border-blue-500 rounded-3xl p-10 text-center bg-white/95 shadow-2xl">
+      <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-red-50 border border-blue-200 flex items-center justify-center mx-auto mb-5 text-blue-600">
+        <i class="ph-duotone ph-file-arrow-down text-5xl"></i>
+      </div>
+      <h2 class="text-2xl font-display font-bold text-slate-900 mb-2">Drop Games or ROMs into Arcadia</h2>
+      <p class="text-slate-600 text-sm mb-4">
+        Drop standalone Prism HTML games or raw ROM files (<code class="text-blue-600 font-mono font-semibold">.z64, .nes, .sfc, .gba, .nds, .psx, .md</code>).
+      </p>
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-medium">
+        <i class="ph-fill ph-sparkle text-red-500"></i>
+        <span>Auto-Deduplicates Cores, Detects Cheats &amp; Enables Rolling Autosave</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MAIN HUB VIEW (LIBRARY BOARD)
+       ===================================================================== -->
+  <div id="hub-view" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen">
+
+    <!-- Top Navigation & Compact Telemetry Header -->
+    <header class="arcadia-glass rounded-2xl p-4 sm:px-6 sm:py-4 mb-6 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-2xl arcadia-btn-primary flex items-center justify-center text-white shadow-md shrink-0">
+          <i class="ph-duotone ph-game-controller text-2xl"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 id="hub-title-display" class="text-xl sm:text-2xl font-display font-bold tracking-tight text-slate-900">Arcadia</h1>
+            <button onclick="openEditHubTitleModal()" title="Rename Hub" class="text-slate-400 hover:text-blue-600 transition p-1 rounded-lg hover:bg-blue-50">
+              <i class="ph-bold ph-pencil-simple text-sm"></i>
+            </button>
+            <span class="px-2.5 py-0.5 text-[11px] font-mono font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-blue-600 to-red-600 text-white shadow-sm">
+              V1.2
+            </span>
+          </div>
+          <!-- Compact Inline Telemetry -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-medium mt-0.5">
+            <span><strong id="stat-games-count" class="text-slate-800 font-semibold">0</strong> games</span>
+            <span class="text-slate-300">•</span>
+            <span><strong id="stat-cores-count" class="text-blue-600 font-semibold">0</strong> bundled cores</span>
+            <span class="text-slate-300">•</span>
+            <span>Pool: <strong id="stat-shared-assets" class="text-slate-800 font-semibold">0 files</strong></span>
+            <span class="text-slate-300">•</span>
+            <span>Bundle: <strong id="stat-total-size" class="text-red-600 font-semibold">0 B</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Action Toolbar -->
+      <div class="flex flex-wrap items-center gap-2">
+        <label for="file-upload-input" class="cursor-pointer arcadia-btn-primary px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white flex items-center gap-2">
+          <i class="ph-bold ph-plus-circle text-base"></i>
+          <span>Add Games</span>
+        </label>
+        <input id="file-upload-input" type="file" multiple accept=".html,.htm,.z64,.n64,.v64,.nes,.sfc,.smc,.gba,.gb,.gbc,.nds,.bin,.iso,.chd,.pbp,.md,.gen,.sms,.gg,.pce,.zip,.7z,.json" class="hidden" onchange="handleFileInput(event)">
+
+        <button onclick="openCoresModal()" class="px-3.5 py-2.5 rounded-xl bg-white hover:bg-blue-50/70 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-semibold flex items-center gap-2 transition shadow-sm">
+          <i class="ph-duotone ph-cpu text-blue-600 text-base"></i>
+          <span>Cores</span>
+          <span id="bundled-cores-pill" class="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-md text-[10px] font-mono font-bold">0</span>
+        </button>
+
+        <button onclick="openAutosaveSettingsModal()" class="px-3.5 py-2.5 rounded-xl bg-white hover:bg-red-50/60 border border-slate-200 hover:border-red-300 text-slate-700 hover:text-red-700 text-xs sm:text-sm font-semibold flex items-center gap-2 transition shadow-sm">
+          <i class="ph-duotone ph-floppy-disk-back text-red-600 text-base"></i>
+          <span>Autosave</span>
+          <span id="autosave-interval-pill" class="px-1.5 py-0.2 bg-red-50 text-red-600 border border-red-200 rounded-md text-[10px] font-mono font-bold">45s</span>
+        </button>
+
+        <button id="folder-connect-btn" onclick="connectLibraryFolder()" class="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center gap-2 transition shadow-sm" title="Store ROMs as separate files on disk">
+          <i class="ph-duotone ph-folder-simple-plus text-blue-600 text-base"></i>
+          <span id="folder-connect-btn-label">Library Folder</span>
+        </button>
+
+        <button onclick="exportCombinedHub()" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition shadow-sm">
+          <i class="ph-bold ph-export text-base text-blue-300"></i>
+          <span id="export-hub-btn-label">Export HTML</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Optional Library Folder Banner -->
+    <div id="folder-status-banner" class="hidden mb-5 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50/90 text-blue-900 text-xs sm:text-sm flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <i class="ph-duotone ph-folder-open text-blue-600 text-lg"></i>
+        <span id="folder-status-text"></span>
+      </div>
+    </div>
+
+    <!-- Search, System Filter Pills & Layout Controls -->
+    <section class="arcadia-glass rounded-2xl p-3.5 sm:px-4 sm:py-3 mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div id="system-filter-bar" class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"></div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="relative flex-1 sm:w-64">
+          <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search library... (/)"
+            oninput="renderGameBoard()"
+            class="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition"
+          >
+          <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+            <i class="ph-bold ph-x text-xs"></i>
+          </button>
+        </div>
+
+        <select id="sort-select" onchange="renderGameBoard()" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-700 font-medium focus:outline-none focus:border-blue-500">
+          <option value="recent">Recent</option>
+          <option value="alpha">A → Z</option>
+          <option value="system">System</option>
+          <option value="size">Size</option>
+        </select>
+
+        <div class="flex items-center rounded-xl bg-slate-100 border border-slate-200 p-0.5">
+          <button id="view-grid-btn" onclick="setBoardLayout('grid')" class="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm transition" title="Grid View">
+            <i class="ph-bold ph-squares-four text-sm"></i>
+          </button>
+          <button id="view-sections-btn" onclick="setBoardLayout('sections')" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 transition" title="Grouped by System">
+            <i class="ph-bold ph-rows text-sm"></i>
+          </button>
+          <button id="view-list-btn" onclick="setBoardLayout('list')" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 transition" title="List View">
+            <i class="ph-bold ph-list-bullets text-sm"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Selection Board Container -->
+    <main class="flex-1">
+      <div id="games-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 pt-5 border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+        <span>Arcadia V1.2 • Rolling Autosave, Native SRAM, Multi-Slot States &amp; Cheat Engine Ready</span>
+      </div>
+      <div>
+        <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px]">F</kbd> Fullscreen •
+        <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px]">F5</kbd>/<kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px]">F8</kbd> Quick Save/Load •
+        <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px]">Alt+M</kbd> Library
+      </div>
+    </footer>
+  </div>
+
+  <!-- =====================================================================
+       ACTIVE GAME PLAYER VIEW (WITH CLEAN AUTO-HIDING FULLSCREEN HUD)
+       ===================================================================== -->
+  <div id="player-view" class="fixed inset-0 z-40 hidden flex-col bg-slate-950" onmousemove="revealFullscreenHud()" ontouchstart="revealFullscreenHud()">
+    <!-- Top Sensor Zone for Fullscreen Mouse Reveal -->
+    <div id="fullscreen-top-sensor" class="fixed top-0 left-0 right-0 h-4 z-30 hidden" onmouseenter="revealFullscreenHud()"></div>
+
+    <!-- Floating / Docked Red-Blue-White Glass HUD -->
+    <div id="player-topbar" class="h-13 px-4 py-2 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-3 z-20 shadow-sm">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <button onclick="returnToHub()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-700 hover:text-red-600 text-xs font-semibold flex items-center gap-1.5 transition shrink-0">
+          <i class="ph-bold ph-arrow-left"></i>
+          <span>Library</span>
+        </button>
+        <span id="player-system-badge" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase bg-gradient-to-r from-blue-600 to-red-600 text-white shrink-0">N64</span>
+        <h2 id="player-game-title" class="text-sm font-display font-bold text-slate-900 truncate">Game Title</h2>
+        <span id="player-autosave-indicator" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-mono font-medium shrink-0">
+          <i class="ph-fill ph-check-circle text-blue-600"></i>
+          <span id="player-autosave-text">Autosave Ready</span>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <button onclick="triggerManualAutosaveNow()" class="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Save Rolling Autosave + Native Battery Now">
+          <i class="ph-bold ph-floppy-disk"></i>
+          <span class="hidden md:inline">Save Now</span>
+        </button>
+
+        <button onclick="togglePlayerDrawer('saves')" id="player-saves-btn" class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 text-slate-700 hover:text-blue-700 text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="ph-duotone ph-stack text-blue-600 text-sm"></i>
+          <span>Saves</span>
+        </button>
+
+        <button onclick="togglePlayerDrawer('cheats')" id="player-cheats-btn" class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-red-50 border border-slate-200 text-slate-700 hover:text-red-600 text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="ph-duotone ph-magic-wand text-red-600 text-sm"></i>
+          <span>Cheats</span>
+          <span id="player-cheats-count" class="px-1.5 py-0.2 rounded-full bg-red-100 text-red-700 text-[10px] font-mono font-bold">0</span>
+        </button>
+
+        <button onclick="restartActiveGame()" class="p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 transition" title="Reboot Game">
+          <i class="ph-bold ph-arrow-counter-clockwise text-sm"></i>
+        </button>
+
+        <button onclick="togglePlayerFullscreen()" id="player-fs-btn" class="px-2.5 py-1.5 rounded-xl arcadia-btn-primary text-white text-xs font-semibold flex items-center gap-1.5" title="Clean Fullscreen Mode (F)">
+          <i id="player-fs-icon" class="ph-bold ph-corners-out text-sm"></i>
+          <span class="hidden sm:inline" id="player-fs-label">Fullscreen</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Viewport -->
+    <div id="iframe-wrapper" class="flex-1 w-full h-full relative bg-black overflow-hidden"></div>
+
+    <!-- In-Game Slide-Over Drawer (Saves & Cheats) -->
+    <aside id="player-drawer" class="fixed top-16 right-4 bottom-4 w-full max-w-md z-30 hidden flex-col rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-50/80 via-white to-red-50/80">
+        <div class="flex items-center gap-2">
+          <button onclick="switchDrawerTab('saves')" id="drawer-tab-saves" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-blue-600 text-white">
+            Saves &amp; States
+          </button>
+          <button onclick="switchDrawerTab('cheats')" id="drawer-tab-cheats" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100">
+            Cheats &amp; Toggles
+          </button>
+        </div>
+        <button onclick="closePlayerDrawer()" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900">
+          <i class="ph-bold ph-x text-base"></i>
+        </button>
+      </div>
+      <div id="player-drawer-body" class="flex-1 overflow-y-auto p-5 space-y-4"></div>
+    </aside>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 1: SAVE MANAGER MODAL (FROM HUB CARDS)
+       ===================================================================== -->
+  <div id="saves-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeSavesModal()">
+    <div class="bg-white max-w-2xl w-full rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-white to-red-50/70">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+            <i class="ph-duotone ph-floppy-disk text-2xl"></i>
+          </div>
+          <div>
+            <h3 id="saves-modal-title" class="text-lg font-display font-bold text-slate-900">Saves &amp; Save States</h3>
+            <p class="text-xs text-slate-500">Rolling autosave, native battery SRAM (.srm/.sav), and 5 manual state slots</p>
+          </div>
+        </div>
+        <button onclick="closeSavesModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+      <div id="saves-modal-body" class="p-6 overflow-y-auto space-y-5"></div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 2: CHEATS MANAGER MODAL (FROM HUB CARDS)
+       ===================================================================== -->
+  <div id="cheats-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeCheatsModal()">
+    <div class="bg-white max-w-2xl w-full rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-red-50/70 via-white to-blue-50/70">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+            <i class="ph-duotone ph-magic-wand text-2xl"></i>
+          </div>
+          <div>
+            <h3 id="cheats-modal-title" class="text-lg font-display font-bold text-slate-900">Cheats &amp; Autodetection</h3>
+            <p class="text-xs text-slate-500">Toggle built-in detected cheats, add custom codes, or import RetroArch .cht files</p>
+          </div>
+        </div>
+        <button onclick="closeCheatsModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+      <div id="cheats-modal-body" class="p-6 overflow-y-auto space-y-4"></div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 3: PERSISTENT EMULATOR CORES & PRE-BUNDLER MODAL
+       ===================================================================== -->
+  <div id="cores-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeCoresModal()">
+    <div class="bg-white max-w-4xl w-full rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div class="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-50/80 via-white to-red-50/80">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+            <i class="ph-duotone ph-cpu text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-display font-bold text-slate-900">Emulator Cores &amp; Export Retention</h3>
+            <p class="text-xs text-slate-500">Pre-bundle emulators so unused cores stay embedded when you export your HTML hub</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="bundleTopConsoleCores()" class="px-3 py-1.5 rounded-xl arcadia-btn-primary text-xs font-semibold text-white flex items-center gap-1.5">
+            <i class="ph-bold ph-sparkle"></i>
+            <span>Bundle Top 8 Cores</span>
+          </button>
+          <label for="import-core-html-input" class="cursor-pointer px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+            <i class="ph-bold ph-file-arrow-up text-blue-600"></i>
+            <span>Import Core from HTML</span>
+          </label>
+          <input id="import-core-html-input" type="file" accept=".html,.htm" class="hidden" onchange="handleImportCoreHtml(event)">
+          <button onclick="closeCoresModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900">
+            <i class="ph-bold ph-x text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 bg-blue-50/60 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <label class="flex items-center gap-2.5 cursor-pointer font-medium text-slate-800">
+          <input id="keep-unused-cores-checkbox" type="checkbox" checked onchange="toggleKeepUnusedCores(this.checked)" class="w-4 h-4 rounded accent-blue-600">
+          <span>Retain all bundled &amp; unused emulator cores inside exported HTML files</span>
+        </label>
+        <span id="cores-modal-summary" class="font-mono text-blue-700 font-semibold"></span>
+      </div>
+
+      <div id="cores-modal-grid" class="p-6 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 4: GAME CONFIGURE & VFS INSPECTOR MODAL
+       ===================================================================== -->
+  <div id="inspector-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeInspectorModal()">
+    <div class="bg-white max-w-2xl w-full rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-white to-red-50/70">
+        <div class="flex items-center gap-3">
+          <i class="ph-duotone ph-sliders-horizontal text-2xl text-blue-600"></i>
+          <div>
+            <h3 id="inspector-title" class="text-lg font-display font-bold text-slate-900">Configure Game</h3>
+            <p class="text-xs text-slate-500">Edit game metadata, core assignment, cover art, or export standalone HTML</p>
+          </div>
+        </div>
+        <button onclick="closeInspectorModal()" class="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Display Title</label>
+            <input id="inspector-title-input" type="text" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Console System</label>
+            <select id="inspector-system-select" onchange="onInspectorSystemChange()" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Emulator Core</label>
+            <select id="inspector-core-select" class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 font-mono focus:outline-none focus:border-blue-500"></select>
+          </div>
+          <div class="sm:col-span-3">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Cover Art (URL or Local Image)</label>
+            <div class="flex items-center gap-2">
+              <input id="inspector-cover-input" type="text" placeholder="https://... or upload image →" class="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-500">
+              <label for="inspector-cover-file" class="cursor-pointer px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-xs font-semibold text-blue-700 flex items-center gap-1.5 shrink-0 transition">
+                <i class="ph-bold ph-image"></i>
+                <span>Upload</span>
+              </label>
+              <input id="inspector-cover-file" type="file" accept="image/*" class="hidden" onchange="handleCoverImageUpload(event)">
+              <button type="button" onclick="document.getElementById('inspector-cover-input').value=''" class="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs text-slate-600" title="Clear Cover">
+                <i class="ph-bold ph-x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Mounted VFS Assets</span>
+            <span id="inspector-vfs-summary" class="text-xs font-mono text-blue-600 font-semibold"></span>
+          </div>
+          <div id="inspector-vfs-list" class="rounded-2xl bg-slate-50 border border-slate-200 divide-y divide-slate-200/80 max-h-40 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button onclick="deleteInspectedGame()" class="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-semibold flex items-center gap-1.5 transition">
+            <i class="ph-bold ph-trash"></i>
+            <span>Remove</span>
+          </button>
+          <button onclick="exportSingleGame(inspectingGameId)" class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <i class="ph-bold ph-download-simple text-blue-600"></i>
+            <span>Standalone HTML</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="closeInspectorModal()" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-600">Cancel</button>
+          <button onclick="saveInspectorChanges()" class="arcadia-btn-primary px-5 py-2 rounded-xl text-xs font-semibold text-white">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 5: AUTOSAVE SETTINGS MODAL
+       ===================================================================== -->
+  <div id="autosave-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeAutosaveSettingsModal()">
+    <div class="bg-white max-w-md w-full rounded-3xl border border-slate-200 p-6 shadow-2xl">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center">
+          <i class="ph-duotone ph-floppy-disk-back text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-display font-bold text-slate-900">Per-Game Autosave</h3>
+          <p class="text-xs text-slate-500">Updates each game's single Rolling Autosave &amp; Native SRAM</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-600 leading-relaxed mb-4">
+        Each game maintains <strong>1 Rolling Autosave slot</strong> plus its <strong>Native Battery Save</strong> (<code class="font-mono text-blue-600">.srm/.sav</code>) that overwrites in place on your timer and whenever you return to the library. Manual Save State slots #1–#5 are never overwritten.
+      </p>
+      <label class="block text-xs font-semibold text-slate-700 mb-1.5">Autosave Interval</label>
+      <select id="autosave-interval-select" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 font-medium mb-5 focus:outline-none focus:border-blue-500">
+        <option value="0">Off (Exit-to-Library Save Only)</option>
+        <option value="30">Every 30 seconds</option>
+        <option value="45">Every 45 seconds (Recommended)</option>
+        <option value="90">Every 90 seconds</option>
+        <option value="180">Every 3 minutes</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeAutosaveSettingsModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-semibold text-slate-700">Cancel</button>
+        <button onclick="saveAutosaveSettings()" class="arcadia-btn-primary px-5 py-2 rounded-xl text-xs font-semibold text-white">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 6: RENAME HUB MODAL
+       ===================================================================== -->
+  <div id="hub-name-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4" onclick="if(event.target===this) closeEditHubTitleModal()">
+    <div class="bg-white max-w-md w-full rounded-3xl border border-slate-200 p-6 shadow-2xl">
+      <h3 class="text-lg font-display font-bold text-slate-900 mb-1">Rename Arcadia Hub</h3>
+      <p class="text-xs text-slate-500 mb-4">Displayed in your library header and saved when exporting HTML.</p>
+      <input id="hub-name-input" type="text" onkeydown="if(event.key==='Enter') saveHubTitle()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-500 mb-5" placeholder="Arcadia">
+      <div class="flex justify-end gap-2">
+        <button onclick="closeEditHubTitleModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-semibold text-slate-700">Cancel</button>
+        <button onclick="saveHubTitle()" class="arcadia-btn-primary px-5 py-2 rounded-xl text-xs font-semibold text-white">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- =====================================================================
+       APPLICATION JAVASCRIPT
+       ===================================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. SUPPORTED CONSOLE SYSTEMS DATABASE (31 SYSTEMS)
+     *************************************************************************/
+    const SYSTEMS_DB = [
+      { id: 'n64',        name: 'Nintendo 64',                   short: 'N64',    cores: ['mupen64plus_next', 'parallel_n64'], exts: ['z64', 'n64', 'v64'], accent: 'from-blue-600 via-indigo-600 to-red-600', icon: 'ph-joystick' },
+      { id: 'nes',        name: 'Nintendo Entertainment System', short: 'NES',    cores: ['fceumm', 'nestopia'],               exts: ['nes', 'fds', 'unif'], accent: 'from-red-600 to-slate-800', icon: 'ph-game-controller' },
+      { id: 'snes',       name: 'Super Nintendo (SNES)',         short: 'SNES',   cores: ['snes9x'],                           exts: ['sfc', 'smc'], accent: 'from-blue-600 to-indigo-800', icon: 'ph-game-controller' },
+      { id: 'gba',        name: 'Game Boy Advance',              short: 'GBA',    cores: ['mgba', 'vba_next'],                 exts: ['gba'], accent: 'from-indigo-600 to-blue-800', icon: 'ph-device-mobile' },
+      { id: 'gb',         name: 'Game Boy / Color',              short: 'GB/GBC', cores: ['gambatte', 'sameboy'],              exts: ['gb', 'gbc', 'dmg'], accent: 'from-blue-500 to-red-500', icon: 'ph-device-mobile' },
+      { id: 'nds',        name: 'Nintendo DS',                   short: 'NDS',    cores: ['melonds', 'desmume'],               exts: ['nds'], accent: 'from-sky-600 to-blue-800', icon: 'ph-devices' },
+      { id: 'vb',         name: 'Virtual Boy',                   short: 'VB',     cores: ['beetle_vb'],                        exts: ['vb', 'vboy'], accent: 'from-red-600 to-rose-900', icon: 'ph-goggles' },
+      { id: 'psx',        name: 'PlayStation (PS1)',             short: 'PS1',    cores: ['pcsx_rearmed', 'mednafen_psx_hw'],  exts: ['bin', 'cue', 'iso', 'chd', 'pbp'], accent: 'from-blue-700 to-slate-900', icon: 'ph-disc' },
+      { id: 'psp',        name: 'PlayStation Portable',          short: 'PSP',    cores: ['ppsspp'],                           exts: ['iso', 'cso', 'pbp'], accent: 'from-slate-700 to-blue-900', icon: 'ph-device-mobile-camera' },
+      { id: 'segaMD',     name: 'Sega Genesis / Mega Drive',     short: 'GEN',    cores: ['genesis_plus_gx', 'picodrive'],     exts: ['md', 'gen', 'bin', 'smd'], accent: 'from-blue-600 to-slate-900', icon: 'ph-game-controller' },
+      { id: 'segaMS',     name: 'Sega Master System',            short: 'SMS',    cores: ['smsplus', 'genesis_plus_gx'],       exts: ['sms'], accent: 'from-red-600 to-blue-900', icon: 'ph-game-controller' },
+      { id: 'segaGG',     name: 'Sega Game Gear',                short: 'GG',     cores: ['genesis_plus_gx'],                  exts: ['gg'], accent: 'from-blue-500 to-red-600', icon: 'ph-device-mobile' },
+      { id: 'segaCD',     name: 'Sega CD / Mega-CD',             short: 'SCD',    cores: ['genesis_plus_gx'],                  exts: ['chd', 'iso', 'cue'], accent: 'from-indigo-600 to-slate-900', icon: 'ph-disc' },
+      { id: 'sega32x',    name: 'Sega 32X',                      short: '32X',    cores: ['picodrive'],                        exts: ['32x'], accent: 'from-red-600 to-slate-800', icon: 'ph-cpu' },
+      { id: 'segaSaturn', name: 'Sega Saturn',                   short: 'SAT',    cores: ['yabause'],                          exts: ['chd', 'iso', 'cue'], accent: 'from-blue-600 to-indigo-900', icon: 'ph-disc' },
+      { id: 'arcade',     name: 'Arcade (FBNeo / MAME)',         short: 'ARCADE', cores: ['fbneo', 'mame2003_plus'],           exts: ['zip', '7z'], accent: 'from-red-600 to-blue-600', icon: 'ph-coin-vertical' },
+      { id: 'neogeo',     name: 'SNK Neo Geo',                   short: 'NEOGEO', cores: ['fbalpha2012_neogeo'],               exts: ['zip', '7z'], accent: 'from-blue-600 to-red-700', icon: 'ph-trophy' },
+      { id: 'ngp',        name: 'Neo Geo Pocket / Color',        short: 'NGP',    cores: ['mednafen_ngp'],                     exts: ['ngp', 'ngc'], accent: 'from-sky-600 to-indigo-800', icon: 'ph-device-mobile' },
+      { id: 'pce',        name: 'PC Engine / TurboGrafx-16',     short: 'PCE',    cores: ['mednafen_pce_fast'],                exts: ['pce', 'cue', 'chd'], accent: 'from-red-500 to-blue-700', icon: 'ph-cpu' },
+      { id: 'pcfx',       name: 'NEC PC-FX',                     short: 'PCFX',   cores: ['mednafen_pcfx'],                    exts: ['cue', 'chd'], accent: 'from-blue-600 to-rose-700', icon: 'ph-disc' },
+      { id: 'ws',         name: 'Bandai WonderSwan / Color',     short: 'WS',     cores: ['mednafen_wswan'],                   exts: ['ws', 'wsc'], accent: 'from-blue-500 to-indigo-700', icon: 'ph-device-mobile' },
+      { id: 'lynx',       name: 'Atari Lynx',                    short: 'LYNX',   cores: ['handy'],                            exts: ['lnx'], accent: 'from-red-600 to-slate-800', icon: 'ph-device-mobile' },
+      { id: 'atari2600',  name: 'Atari 2600',                    short: 'A2600',  cores: ['stella2014'],                       exts: ['a26', 'bin'], accent: 'from-red-600 to-blue-900', icon: 'ph-joystick' },
+      { id: 'atari5200',  name: 'Atari 5200',                    short: 'A5200',  cores: ['a5200'],                            exts: ['a52'], accent: 'from-sky-600 to-slate-800', icon: 'ph-joystick' },
+      { id: 'atari7800',  name: 'Atari 7800',                    short: 'A7800',  cores: ['prosystem'],                        exts: ['a78'], accent: 'from-rose-600 to-blue-900', icon: 'ph-joystick' },
+      { id: 'jaguar',     name: 'Atari Jaguar',                  short: 'JAG',    cores: ['virtualjaguar'],                    exts: ['j64', 'jag'], accent: 'from-red-600 to-slate-900', icon: 'ph-paw-print' },
+      { id: 'c64',        name: 'Commodore 64 / Amiga',          short: 'C64',    cores: ['vice_x64', 'puae'],                 exts: ['d64', 'prg', 'tap', 'adf'], accent: 'from-blue-700 to-indigo-950', icon: 'ph-keyboard' },
+      { id: 'dos',        name: 'MS-DOS (DOSBox-Pure)',          short: 'DOS',    cores: ['dosbox_pure'],                      exts: ['zip', 'dosz', 'exe'], accent: 'from-slate-700 to-blue-800', icon: 'ph-terminal-window' },
+      { id: 'coleco',     name: 'ColecoVision',                  short: 'COLECO', cores: ['gearcoleco'],                       exts: ['col', 'cv'], accent: 'from-red-500 to-blue-800', icon: 'ph-game-controller' },
+      { id: 'vectrex',    name: 'GCE Vectrex',                   short: 'VEC',    cores: ['vecx'],                             exts: ['vec'], accent: 'from-blue-600 to-slate-900', icon: 'ph-polygon' },
+      { id: 'html5',      name: 'Standalone Web / HTML5',        short: 'HTML5',  cores: ['native_html5'],                     exts: ['html', 'htm'], accent: 'from-blue-600 to-red-600', icon: 'ph-code' }
+    ];
+
+    function getSystemMeta(sysId) {
+      return SYSTEMS_DB.find(s => s.id === sysId) || SYSTEMS_DB[SYSTEMS_DB.length - 1];
+    }
+
+    /*************************************************************************
+     * 2. GLOBAL APPLICATION STATE (V1.2)
+     *************************************************************************/
+    let hubState = {
+      version: '1.2',
+      hubTitle: 'Arcadia',
+      keepUnusedCoresOnExport: true,
+      autosaveIntervalSec: 45,
+      sharedAssets: {},
+      games: [],
+      saves: {},
+      cheats: {}
+    };
+
+    let activeFilterSystem = 'all';
+    let boardLayout = 'grid';
+    let activePlayingGameId = null;
+    let activeBlobUrl = null;
+    let activeRomBlobUrl = null; // the blob: URL for the currently playing game's raw ROM bytes
+    let inspectingGameId = null;
+    let savesModalGameId = null;
+    let cheatsModalGameId = null;
+    let collapsedSections = {};
+    let autosaveTimerHandle = null;
+    let fullscreenHudTimer = null;
+    let currentDrawerTab = 'saves';
+    let pendingBootStatePayload = null;
+
+    /*************************************************************************
+     * 3. INDEXEDDB PERSISTENCE FOR SAVES, STATES & AUTOSAVES
+     *************************************************************************/
+    const SAVES_DB_NAME = 'arcadia-v12-saves-db';
+    const SAVES_STORE = 'game_saves';
+
+    function openSavesDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(SAVES_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(SAVES_STORE)) {
+            req.result.createObjectStore(SAVES_STORE);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function persistGameSaveRecord(gameId, record) {
+      hubState.saves[gameId] = record;
+      try {
+        const db = await openSavesDb();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(SAVES_STORE, 'readwrite');
+          tx.objectStore(SAVES_STORE).put(record, gameId);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch (e) {
+        console.warn('[Arcadia Saves] IndexedDB write fallback:', e);
+      }
+      if (libraryDirHandle) {
+        saveLibraryJsonToFolder().catch(() => {});
+      }
+    }
+
+    async function loadAllPersistedSaves() {
+      try {
+        const db = await openSavesDb();
+        const tx = db.transaction(SAVES_STORE, 'readonly');
+        const store = tx.objectStore(SAVES_STORE);
+        const keysReq = store.getAllKeys();
+        const valsReq = store.getAll();
+        await new Promise((resolve) => {
+          tx.oncomplete = () => {
+            const keys = keysReq.result || [];
+            const vals = valsReq.result || [];
+            for (let i = 0; i < keys.length; i++) {
+              if (!hubState.saves[keys[i]] && vals[i]) {
+                hubState.saves[keys[i]] = vals[i];
+              }
+            }
+            resolve(true);
+          };
+          tx.onerror = () => resolve(false);
+        });
+      } catch (e) {}
+    }
+
+    function getGameSaveRecord(gameId) {
+      if (!hubState.saves[gameId]) {
+        hubState.saves[gameId] = {
+          autosave: null,
+          nativeSram: null,
+          slots: [null, null, null, null, null]
+        };
+      }
+      const rec = hubState.saves[gameId];
+      if (!Array.isArray(rec.slots) || rec.slots.length < 5) {
+        rec.slots = [rec.slots?.[0] || null, rec.slots?.[1] || null, rec.slots?.[2] || null, rec.slots?.[3] || null, rec.slots?.[4] || null];
+      }
+      return rec;
+    }
+
+    function hasAnySaveData(gameId) {
+      const rec = hubState.saves[gameId];
+      if (!rec) return false;
+      return Boolean(rec.autosave || rec.nativeSram || (rec.slots && rec.slots.some(Boolean)));
+    }
+
+    /*************************************************************************
+     * 4. BUILT-IN CHEAT DATABASE & AUTODETECTION ENGINE
+     *************************************************************************/
+    const BUILTIN_CHEATS_CATALOG = [
+      {
+        match: ['mario 64', 'sm64'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Infinite Lives', code: '8033B21D 0063', type: 'gameshark' },
+          { name: 'Infinite Health & Breath', code: '8133B21E 08FF', type: 'gameshark' },
+          { name: 'Moon Jump (Hold L)', code: 'D033AFA1 0020\n8133B1BC 4220', type: 'gameshark' },
+          { name: 'All 120 Stars Unlocked', code: '8120770C FFFF\n8120770E FFFF', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['ocarina of time', 'zelda'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Infinite Hearts', code: '8111A600 0140\n8111A602 0140', type: 'gameshark' },
+          { name: 'Infinite Magic', code: '8011A605 0060', type: 'gameshark' },
+          { name: 'Infinite Rupees (500)', code: '8111A606 01F4', type: 'gameshark' },
+          { name: 'Infinite Deku Sticks & Nuts', code: '8011A644 0063\n8011A645 0063', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['majora'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Infinite Hearts', code: '811EF6A4 0140\n811EF6A6 0140', type: 'gameshark' },
+          { name: 'Infinite Magic', code: '801EF6A9 0060', type: 'gameshark' },
+          { name: 'Infinite Rupees', code: '811EF6AA 01F4', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['mario kart 64', 'mk64'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Always Have Triple Red Shells', code: '81165E18 0007', type: 'gameshark' },
+          { name: 'All Cups & Extra Mode Unlocked', code: '810DC540 000F', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['goldeneye', '007'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Invincibility', code: '8002CE44 0001', type: 'gameshark' },
+          { name: 'Infinite Ammo (No Reload)', code: '80030B28 0001', type: 'gameshark' },
+          { name: 'All Guns & Missions', code: '8002CE40 0001', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['smash bros'],
+        systems: ['n64'],
+        cheats: [
+          { name: 'Unlock All Characters & Stages', code: '810A4938 FFFF', type: 'gameshark' },
+          { name: 'Infinite Lives (1P)', code: '800A4B33 0005', type: 'gameshark' }
+        ]
+      },
+      {
+        match: ['pokemon emerald', 'emerald'],
+        systems: ['gba'],
+        cheats: [
+          { name: 'Infinite Money ($999,999)', code: 'D8BAE4D9 4864DCE5\nA86CDBA5 19BA49B3', type: 'actionreplay' },
+          { name: '100% Catch Rate (Master Ball Effect)', code: 'B749822B CE9BFAC1\nA86CDBA5 19BA49B3', type: 'actionreplay' },
+          { name: 'Walk Through Walls', code: '7881A409 E2026E0C\n8E883EFF 92E9660D', type: 'actionreplay' }
+        ]
+      },
+      {
+        match: ['pokemon firered', 'fire red', 'leafgreen', 'leaf green'],
+        systems: ['gba'],
+        cheats: [
+          { name: 'Infinite Money', code: '3C25A344 FD8F451C\nAD86124F 2823D8DA', type: 'actionreplay' },
+          { name: 'Max Rare Candies in PC', code: '82025840 0044', type: 'codebreaker' }
+        ]
+      },
+      {
+        match: ['super mario world', 'smw'],
+        systems: ['snes'],
+        cheats: [
+          { name: 'Infinite Lives (99)', code: '7E0DBE63', type: 'par' },
+          { name: 'Always Have Cape Powerup', code: '7E001902', type: 'par' },
+          { name: 'Invincible Starman', code: '7E1490FF', type: 'par' }
+        ]
+      },
+      {
+        match: ['super metroid'],
+        systems: ['snes'],
+        cheats: [
+          { name: 'Infinite Energy', code: '7E09C2E7\n7E09C303', type: 'par' },
+          { name: 'Infinite Missiles', code: '7E09C6E7', type: 'par' }
+        ]
+      },
+      {
+        match: ['chrono trigger'],
+        systems: ['snes'],
+        cheats: [
+          { name: 'Max Gold', code: '7E2C537F\n7E2C5496\n7E2C5598', type: 'par' },
+          { name: 'Infinite HP (Slot 1)', code: '7E2603E7\n7E260403', type: 'par' }
+        ]
+      },
+      {
+        match: ['super mario bros', 'smb3', 'mario 3'],
+        systems: ['nes'],
+        cheats: [
+          { name: 'Infinite Lives', code: 'SLXPLOVS', type: 'gamegenie' },
+          { name: 'Start & Stay Super / Fire', code: 'XUKLGLIE', type: 'gamegenie' },
+          { name: 'Moon Jump', code: 'APZLGK', type: 'gamegenie' }
+        ]
+      },
+      {
+        match: ['sonic'],
+        systems: ['segaMD'],
+        cheats: [
+          { name: 'Infinite Lives', code: 'FFFE12:0009', type: 'par' },
+          { name: 'Invincibility', code: 'FFFE2D:0001', type: 'par' },
+          { name: 'Debug Mode Enabled', code: 'FFFFFA:0001', type: 'par' }
+        ]
+      },
+      {
+        match: ['castlevania', 'symphony of the night', 'sotn'],
+        systems: ['psx'],
+        cheats: [
+          { name: 'Infinite HP', code: '80097BA0 03E7', type: 'gameshark' },
+          { name: 'Infinite MP & Hearts', code: '80097BA8 03E7\n80097BB0 03E7', type: 'gameshark' }
+        ]
+      }
+    ];
+
+    function autodetectCheatsForGame(game) {
+      if (hubState.cheats[game.id] && Array.isArray(hubState.cheats[game.id])) {
+        return hubState.cheats[game.id];
+      }
+      const hay = ((game.title || '') + ' ' + (game.romName || '') + ' ' + (game.rawFileName || '')).toLowerCase();
+      const detected = [];
+      let idx = 1;
+
+      for (const entry of BUILTIN_CHEATS_CATALOG) {
+        const sysMatch = !entry.systems || entry.systems.includes(game.system);
+        const titleMatch = entry.match.some(kw => hay.includes(kw));
+        if (sysMatch && titleMatch) {
+          for (const c of entry.cheats) {
+            detected.push({
+              id: 'cheat_' + game.id + '_' + (idx++),
+              name: c.name,
+              code: c.code,
+              enabled: false,
+              source: 'Autodetected (' + (c.type || 'Built-in') + ')'
+            });
+          }
+        }
+      }
+
+      // Universal Core / Runtime Enhancers available for every game
+      if (game.system !== 'html5') {
+        detected.push({
+          id: 'cheat_' + game.id + '_ff',
+          name: 'Turbo Fast-Forward (2x Speed)',
+          code: '__ARCADIA_TURBO_2X__',
+          enabled: false,
+          source: 'Universal Core Enhancer'
+        });
+        detected.push({
+          id: 'cheat_' + game.id + '_slow',
+          name: 'Precision Slow-Motion (0.5x Speed)',
+          code: '__ARCADIA_SLOWMO__',
+          enabled: false,
+          source: 'Universal Core Enhancer'
+        });
+      } else {
+        detected.push({
+          id: 'cheat_' + game.id + '_html_speed',
+          name: 'HTML5 Game Speed Boost (1.5x RAF)',
+          code: '__ARCADIA_HTML5_BOOST__',
+          enabled: false,
+          source: 'HTML5 Runtime Hook'
+        });
+      }
+
+      hubState.cheats[game.id] = detected;
+      return detected;
+    }
+
+    function getEnabledCheatsCount(gameId) {
+      const list = hubState.cheats[gameId] || [];
+      return list.filter(c => c.enabled).length;
+    }
+
+    function toggleGameCheat(gameId, cheatId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      const list = autodetectCheatsForGame(game);
+      const item = list.find(c => c.id === cheatId);
+      if (!item) return;
+
+      item.enabled = !item.enabled;
+
+      // Mutual exclusion for Turbo vs Slow-Motion
+      if (item.enabled && item.code === '__ARCADIA_TURBO_2X__') {
+        list.forEach(c => { if (c.code === '__ARCADIA_SLOWMO__') c.enabled = false; });
+      } else if (item.enabled && item.code === '__ARCADIA_SLOWMO__') {
+        list.forEach(c => { if (c.code === '__ARCADIA_TURBO_2X__') c.enabled = false; });
+      }
+
+      if (activePlayingGameId === gameId) {
+        syncCheatsToActiveIframe(gameId);
+      }
+
+      updatePlayerCheatBadge(gameId);
+      renderGameBoard();
+      if (cheatsModalGameId === gameId) renderCheatsModalBody(gameId);
+      if (activePlayingGameId === gameId && currentDrawerTab === 'cheats') renderPlayerDrawerBody();
+      if (libraryDirHandle) saveLibraryJsonToFolder().catch(() => {});
+    }
+
+    function syncCheatsToActiveIframe(gameId) {
+      const iframe = document.getElementById('active-game-iframe');
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!iframe || !iframe.contentWindow || !game) return;
+      const list = autodetectCheatsForGame(game);
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'PRISM_APPLY_CHEATS',
+          cheats: list
+        }, '*');
+      } catch (e) {}
+    }
+
+    function addCustomCheatToGame(gameId, nameInputId, codeInputId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      const nameEl = document.getElementById(nameInputId);
+      const codeEl = document.getElementById(codeInputId);
+      const name = (nameEl?.value || '').trim();
+      const code = (codeEl?.value || '').trim();
+      if (!name || !code) {
+        showToast('Enter both a cheat name and code.', 'error');
+        return;
+      }
+      const list = autodetectCheatsForGame(game);
+      list.unshift({
+        id: 'cheat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name,
+        code,
+        enabled: true,
+        source: 'Custom Code'
+      });
+      if (nameEl) nameEl.value = '';
+      if (codeEl) codeEl.value = '';
+
+      if (activePlayingGameId === gameId) syncCheatsToActiveIframe(gameId);
+      updatePlayerCheatBadge(gameId);
+      renderGameBoard();
+      if (cheatsModalGameId === gameId) renderCheatsModalBody(gameId);
+      if (activePlayingGameId === gameId && currentDrawerTab === 'cheats') renderPlayerDrawerBody();
+      showToast('Added & enabled "' + name + '"!', 'success');
+    }
+
+    function deleteGameCheat(gameId, cheatId) {
+      const list = hubState.cheats[gameId];
+      if (!list) return;
+      const idx = list.findIndex(c => c.id === cheatId);
+      if (idx !== -1) {
+        list.splice(idx, 1);
+        if (activePlayingGameId === gameId) syncCheatsToActiveIframe(gameId);
+        updatePlayerCheatBadge(gameId);
+        renderGameBoard();
+        if (cheatsModalGameId === gameId) renderCheatsModalBody(gameId);
+        if (activePlayingGameId === gameId && currentDrawerTab === 'cheats') renderPlayerDrawerBody();
+      }
+    }
+
+    async function handleImportChtFile(event, gameId) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      const text = await file.text();
+      const list = autodetectCheatsForGame(game);
+      const descMap = {};
+      const codeMap = {};
+      for (const line of text.split(/\r?\n/)) {
+        const dm = line.match(/^cheat(\d+)_desc\s*=\s*"([^"]*)"/i);
+        if (dm) descMap[dm[1]] = dm[2];
+        const cm = line.match(/^cheat(\d+)_code\s*=\s*"([^"]*)"/i);
+        if (cm) codeMap[cm[1]] = cm[2];
+      }
+      let added = 0;
+      for (const idx of Object.keys(codeMap)) {
+        if (!codeMap[idx]) continue;
+        list.push({
+          id: 'cht_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).slice(2, 5),
+          name: descMap[idx] || ('Imported Cheat #' + idx),
+          code: codeMap[idx].replace(/\+/g, '\n'),
+          enabled: false,
+          source: 'Imported .cht'
+        });
+        added++;
+      }
+      if (added > 0) {
+        renderGameBoard();
+        if (cheatsModalGameId === gameId) renderCheatsModalBody(gameId);
+        if (activePlayingGameId === gameId && currentDrawerTab === 'cheats') renderPlayerDrawerBody();
+        showToast('Imported ' + added + ' cheats from ' + file.name, 'success');
+      } else {
+        showToast('No valid RetroArch cheat entries found in file.', 'error');
+      }
+    }
+
+    function updatePlayerCheatBadge(gameId) {
+      const el = document.getElementById('player-cheats-count');
+      if (el) el.textContent = String(getEnabledCheatsCount(gameId));
+    }
+
+    /*************************************************************************
+     * 5. LIBRARY FOLDER MODE (File System Access API)
+     *************************************************************************/
+    let libraryDirHandle = null;
+    let romsDirHandle = null;
+    let hasStoredFolderHandle = false;
+
+    const FS_IDB_NAME = 'arcadia-hub-fs';
+    const FS_IDB_STORE = 'handles';
+
+    function fsIdbOpen() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(FS_IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(FS_IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function fsIdbGet(key) {
+      const db = await fsIdbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(FS_IDB_STORE, 'readonly');
+        const req = tx.objectStore(FS_IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function fsIdbSet(key, val) {
+      const db = await fsIdbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(FS_IDB_STORE, 'readwrite');
+        tx.objectStore(FS_IDB_STORE).put(val, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    function supportsFileSystemAccess() {
+      return typeof window.showDirectoryPicker === 'function';
+    }
+
+    function updateFolderUi() {
+      const banner = document.getElementById('folder-status-banner');
+      const text = document.getElementById('folder-status-text');
+      const btnLabel = document.getElementById('folder-connect-btn-label');
+      const exportLabel = document.getElementById('export-hub-btn-label');
+      if (!banner || !text || !btnLabel) return;
+
+      if (libraryDirHandle) {
+        banner.classList.remove('hidden');
+        text.textContent = 'Library Folder connected ("' + (libraryDirHandle.name || 'folder') + '") — ROMs & saves persist automatically on disk.';
+        btnLabel.textContent = 'Folder Connected';
+        if (exportLabel) exportLabel.textContent = 'Save Library';
+      } else {
+        banner.classList.toggle('hidden', !hasStoredFolderHandle);
+        if (hasStoredFolderHandle) {
+          text.textContent = 'A Library Folder was previously connected. Click "Reconnect Folder" to restore access.';
+        }
+        btnLabel.textContent = hasStoredFolderHandle ? 'Reconnect Folder' : 'Library Folder';
+        if (exportLabel) exportLabel.textContent = 'Export HTML';
+      }
+    }
+
+    async function writeRomBytesToDisk(gameId, ext, bytes) {
+      if (!romsDirHandle) return null;
+      const fileName = gameId + '.' + (ext || 'bin');
+      const fileHandle = await romsDirHandle.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(bytes);
+      await writable.close();
+      return fileName;
+    }
+
+    async function readRomBytesFromDisk(fileName) {
+      if (!romsDirHandle || !fileName) return new Uint8Array(0);
+      const fileHandle = await romsDirHandle.getFileHandle(fileName);
+      const file = await fileHandle.getFile();
+      return new Uint8Array(await file.arrayBuffer());
+    }
+
+    async function removeRomFileFromDisk(fileName) {
+      if (!romsDirHandle || !fileName) return;
+      try { await romsDirHandle.removeEntry(fileName); } catch (e) {}
+    }
+
+    async function saveLibraryJsonToFolder() {
+      if (!libraryDirHandle) return;
+      syncSectionedDomTree();
+      const metaGames = hubState.games.map(g => {
+        const clone = Object.assign({}, g);
+        delete clone.romBytes;
+        if (!clone.romDiskFile) delete clone.romBase64;
+        return clone;
+      });
+      const snapshot = Object.assign({}, hubState, { games: metaGames });
+      const fileHandle = await libraryDirHandle.getFileHandle('library.json', { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(snapshot, null, 2));
+      await writable.close();
+    }
+
+    async function loadLibraryFromFolderIfPresent() {
+      try {
+        const fileHandle = await libraryDirHandle.getFileHandle('library.json');
+        const file = await fileHandle.getFile();
+        const parsed = JSON.parse(await file.text());
+        if (parsed && Array.isArray(parsed.games)) {
+          hubState = Object.assign(hubState, parsed);
+        }
+      } catch (e) {}
+    }
+
+    async function connectLibraryFolder() {
+      if (!supportsFileSystemAccess()) {
+        showToast('Folder mode requires desktop Chrome or Edge. Using standalone HTML mode.', 'error');
+        return;
+      }
+      try {
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        libraryDirHandle = handle;
+        romsDirHandle = await handle.getDirectoryHandle('roms', { create: true });
+        await fsIdbSet('libraryDirHandle', handle);
+        hasStoredFolderHandle = true;
+        await loadLibraryFromFolderIfPresent();
+        updateFolderUi();
+        renderAll();
+        showToast('Library Folder connected!', 'success');
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        showToast('Could not connect library folder.', 'error');
+      }
+    }
+
+    async function tryRestoreLibraryFolder() {
+      if (!supportsFileSystemAccess()) return;
+      try {
+        const handle = await fsIdbGet('libraryDirHandle');
+        if (!handle) return;
+        hasStoredFolderHandle = true;
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          libraryDirHandle = handle;
+          romsDirHandle = await handle.getDirectoryHandle('roms', { create: true });
+          await loadLibraryFromFolderIfPresent();
+        }
+      } catch (e) {}
+      updateFolderUi();
+    }
+
+    /*************************************************************************
+     * 6. PERSISTENT EMULATOR CORE POOL & PRE-BUNDLER
+     *************************************************************************/
+    const SHARED_ENGINE_KEYS = new Set([
+      'loader.js',
+      'emulator.min.js',
+      'emulator.min.css',
+      'version.json',
+      'localization/en.json',
+      'compression/extract7z.js',
+      'compression/extractzip.js'
+    ]);
+
+    function computeAssetFingerprint(key, str) {
+      let h1 = 0xdeadbeef ^ str.length;
+      let h2 = 0x41c6ce57 ^ str.length;
+      const step = Math.max(1, Math.floor(str.length / 512));
+      for (let i = 0; i < str.length; i += step) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      return key.replace(/[^a-zA-Z0-9]/g, '_') + '_' + (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36) + '_' + str.length.toString(36);
+    }
+
+    function pruneOrphanedSharedAssets() {
+      const referencedIds = new Set();
+      for (const g of hubState.games || []) {
+        for (const entry of Object.values(g.vfsManifest || {})) {
+          if (entry && entry.mode === 'shared' && entry.assetId) {
+            referencedIds.add(entry.assetId);
+          }
+        }
+      }
+      const keepCores = hubState.keepUnusedCoresOnExport !== false;
+      for (const [assetId, asset] of Object.entries(hubState.sharedAssets || {})) {
+        if (keepCores && asset && asset.category === 'engine-core') {
+          continue; // Always keep bundled/cached emulator cores even if currently unused
+        }
+        if (!referencedIds.has(assetId)) {
+          delete hubState.sharedAssets[assetId];
+        }
+      }
+    }
+
+    function isCoreBundled(coreName) {
+      if (!coreName || coreName === 'native_html5') return true;
+      const assets = Object.values(hubState.sharedAssets || {});
+      const hasLoader = assets.some(a => a && a.keyHint === 'loader.js');
+      const hasCoreWasm = assets.some(a => a && a.keyHint && a.keyHint.startsWith('cores/' + coreName));
+      return hasLoader && hasCoreWasm;
+    }
+
+    function getBundledSystemsCount() {
+      return SYSTEMS_DB.filter(s => s.id !== 'html5' && s.cores.some(c => isCoreBundled(c))).length;
+    }
+
+    async function fetchAndStoreRuntimeFile(relPath, isBinary) {
+      const existing = Object.values(hubState.sharedAssets || {}).find(a => a && a.keyHint === relPath);
+      if (existing) return existing;
+
+      const cdns = [
+        'https://cdn.emulatorjs.org/stable/data/',
+        'https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@4.2.3/data/'
+      ];
+      let lastErr = null;
+      for (const base of cdns) {
+        try {
+          const resp = await fetch(base + relPath);
+          if (!resp.ok) continue;
+          let contentStr = '';
+          if (isBinary) {
+            const buf = new Uint8Array(await resp.arrayBuffer());
+            contentStr = 'pv:base64:' + encodeBytesToBase64(buf);
+          } else {
+            contentStr = await resp.text();
+          }
+          const assetId = computeAssetFingerprint(relPath, contentStr);
+          hubState.sharedAssets[assetId] = {
+            keyHint: relPath,
+            category: 'engine-core',
+            content: contentStr,
+            size: contentStr.length
+          };
+          return hubState.sharedAssets[assetId];
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error('Failed to download ' + relPath);
+    }
+
+    async function bundleCoreForSystem(sysId, silent) {
+      const sys = getSystemMeta(sysId);
+      if (!sys || sys.id === 'html5') return;
+      const coreName = sys.cores[0];
+
+      try {
+        if (!silent) showToast('Bundling ' + sys.short + ' (' + coreName + ') emulator core…', 'info');
+
+        await fetchAndStoreRuntimeFile('loader.js', false);
+        await fetchAndStoreRuntimeFile('emulator.min.js', false);
+        await fetchAndStoreRuntimeFile('emulator.min.css', false);
+        try { await fetchAndStoreRuntimeFile('version.json', false); } catch (e) {}
+        try { await fetchAndStoreRuntimeFile('localization/en.json', false); } catch (e) {}
+        try { await fetchAndStoreRuntimeFile('compression/extract7z.js', false); } catch (e) {}
+        try { await fetchAndStoreRuntimeFile('compression/extractzip.js', false); } catch (e) {}
+
+        const candidates = [
+          'cores/' + coreName + '-wasm.data',
+          'cores/' + coreName + '-legacy-wasm.data'
+        ];
+        let coreFetched = false;
+        for (const cPath of candidates) {
+          try {
+            await fetchAndStoreRuntimeFile(cPath, true);
+            coreFetched = true;
+            break;
+          } catch (e) {}
+        }
+        if (!coreFetched) {
+          throw new Error('Could not fetch WASM data for ' + coreName);
+        }
+
+        renderAll();
+        if (!document.getElementById('cores-modal').classList.contains('hidden')) {
+          renderCoresModalGrid();
+        }
+        if (libraryDirHandle) await saveLibraryJsonToFolder();
+        if (!silent) showToast('Bundled ' + sys.short + ' (' + coreName + ') for offline export!', 'success');
+      } catch (err) {
+        console.error('Bundle core error:', err);
+        if (!silent) showToast('Could not fetch ' + sys.short + ' core online. You can also use "Import Core from HTML".', 'error');
+      }
+    }
+
+    async function bundleTopConsoleCores() {
+      const topIds = ['n64', 'gba', 'snes', 'nes', 'gb', 'nds', 'psx', 'segaMD'];
+      showToast('Bundling Top 8 Console Cores into Arcadia…', 'info');
+      for (const id of topIds) {
+        await bundleCoreForSystem(id, true);
+      }
+      renderAll();
+      renderCoresModalGrid();
+      showToast('Bundled Top 8 Console Cores! They will stay inside your exported HTML.', 'success');
+    }
+
+    async function handleImportCoreHtml(event) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const vfsTagMatch = /<script\b(?=[^>]*\bid\s*=\s*["']vfs-data["'])[^>]*>/i.exec(text);
+        if (!vfsTagMatch) {
+          showToast('No #vfs-data core dictionary found in that HTML file.', 'error');
+          return;
+        }
+        const jsonStart = text.indexOf('>', vfsTagMatch.index) + 1;
+        const closeMatch = /<\/script\s*>/i.exec(text.slice(jsonStart));
+        if (!closeMatch) {
+          showToast('Invalid VFS script tag in file.', 'error');
+          return;
+        }
+        const parsedVfs = JSON.parse(text.slice(jsonStart, jsonStart + closeMatch.index).trim());
+        let importedCount = 0;
+        for (const [k, v] of Object.entries(parsedVfs)) {
+          const isEngine = SHARED_ENGINE_KEYS.has(k) || k.startsWith('cores/') || k.startsWith('compression/') || k.startsWith('localization/');
+          if (!isEngine) continue;
+          const strVal = typeof v === 'string' ? v : JSON.stringify(v);
+          const assetId = computeAssetFingerprint(k, strVal);
+          if (!hubState.sharedAssets[assetId]) {
+            hubState.sharedAssets[assetId] = {
+              keyHint: k,
+              category: 'engine-core',
+              content: strVal,
+              size: strVal.length
+            };
+            importedCount++;
+          }
+        }
+        renderAll();
+        renderCoresModalGrid();
+        showToast('Imported ' + importedCount + ' engine/core asset(s) into Arcadia!', 'success');
+      } catch (e) {
+        showToast('Failed to extract core from HTML file.', 'error');
+      }
+    }
+
+    function toggleKeepUnusedCores(checked) {
+      hubState.keepUnusedCoresOnExport = Boolean(checked);
+      if (!checked) pruneOrphanedSharedAssets();
+      renderAll();
+      renderCoresModalGrid();
+    }
+
+    /*************************************************************************
+     * 7. PRISM VFS BOOTLOADER & IN-IFRAME RUNTIME BRIDGE
+     *    (Handles Same-Origin ROMs, Cheats, SRAM/State Saves & Fullscreen)
+     *************************************************************************/
+    function generateFallbackPrismVfsBootScript(gameTitle, systemId, coreName, romKeyHint) {
+      return [
+        "(async function __PrismVfsRecompiledBoot() {",
+        "  const vfsEl = document.getElementById('vfs-data');",
+        "  if (!vfsEl) return;",
+        "  let rawVfs = {};",
+        "  try { rawVfs = JSON.parse(vfsEl.textContent); } catch (err) { console.error('[Arcadia VFS] JSON parse error:', err); return; }",
+        "  let mount = document.getElementById('game');",
+        "  if (!mount) {",
+        "    mount = document.createElement('div');",
+        "    mount.id = 'game';",
+        "    mount.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;background:#000';",
+        "    document.body.appendChild(mount);",
+        "  }",
+        "  const statusBanner = document.createElement('div');",
+        "  statusBanner.id = 'arcadia-boot-status';",
+        "  statusBanner.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#05070d;color:#e2e8f0;font:500 14px system-ui,-apple-system,sans-serif;z-index:9999;gap:10px;text-align:center;padding:24px';",
+        "  statusBanner.innerHTML = '<div style=\"width:30px;height:30px;border:3px solid rgba(37,99,235,0.28);border-top-color:#3b82f6;border-right-color:#ef4444;border-radius:50%;animation:arcSpin .8s linear infinite\"></div><div id=\"arcadia-boot-text\">Unpacking game runtime…</div><style>@keyframes arcSpin{to{transform:rotate(360deg)}}</style>';",
+        "  document.body.appendChild(statusBanner);",
+        "  const setStatus = (txt) => { const el = document.getElementById('arcadia-boot-text'); if (el) el.textContent = txt; };",
+        "  const clearStatus = () => { if (statusBanner && statusBanner.parentNode) statusBanner.remove(); };",
+        "  const B91_ALPHABET = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,-./:;=?@[]^_\\u0060{|}~'\\\"\";",
+        "  const B91_LOOKUP = new Int16Array(256).fill(-1);",
+        "  for (let i = 0; i < B91_ALPHABET.length; i++) B91_LOOKUP[B91_ALPHABET.charCodeAt(i)] = i;",
+        "  function decodeBase91(str) {",
+        "    const len = str.length;",
+        "    const out = new Uint8Array(Math.ceil(len * 14 / 16) + 8);",
+        "    let pos = 0, v = -1, b = 0, n = 0;",
+        "    for (let i = 0; i < len; i++) {",
+        "      const c = B91_LOOKUP[str.charCodeAt(i)];",
+        "      if (c === -1) continue;",
+        "      if (v < 0) { v = c; } else {",
+        "        v += c * 91; b |= v << n; n += (v & 8191) > 88 ? 13 : 14;",
+        "        do { out[pos++] = b & 255; b >>= 8; n -= 8; } while (n > 7);",
+        "        v = -1;",
+        "      }",
+        "    }",
+        "    if (v + 1) out[pos++] = (b | v << n) & 255;",
+        "    return out.subarray(0, pos);",
+        "  }",
+        "  async function unpackVfsEntry(val) {",
+        "    if (typeof val !== 'string') return new TextEncoder().encode(String(val));",
+        "    if (val.startsWith('pv:base64:')) {",
+        "      const bin = atob(val.slice(10));",
+        "      const out = new Uint8Array(bin.length);",
+        "      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);",
+        "      return out;",
+        "    }",
+        "    if (!val.startsWith('pv:deflate-raw-b91:')) return new TextEncoder().encode(val);",
+        "    const compressed = decodeBase91(val.slice(19));",
+        "    const ds = new DecompressionStream('deflate-raw');",
+        "    const writer = ds.writable.getWriter();",
+        "    const outputPromise = new Response(ds.readable).arrayBuffer();",
+        "    await writer.write(compressed);",
+        "    await writer.close();",
+        "    return new Uint8Array(await outputPromise);",
+        "  }",
+        "  const blobMap = Object.create(null);",
+        "  if (window.__ARCADIA_PENDING_ROM__) {",
+        "    setStatus('Loading ROM into memory…');",
+        "    if (window.__ARCADIA_ROM_BLOB_URL__) {",
+        "      blobMap[" + JSON.stringify(romKeyHint) + "] = window.__ARCADIA_ROM_BLOB_URL__;",
+        "    } else {",
+        "      const romBytes = await new Promise((resolve) => {",
+        "        if (window.__ARCADIA_ROM_BYTES__) return resolve(window.__ARCADIA_ROM_BYTES__);",
+        "        const onMsg = (ev) => {",
+        "          if (ev.data && ev.data.type === 'PRISM_INIT_ROM' && ev.data.bytes) {",
+        "            window.removeEventListener('message', onMsg);",
+        "            clearInterval(reqTimer);",
+        "            resolve(ev.data.bytes);",
+        "          }",
+        "        };",
+        "        window.addEventListener('message', onMsg);",
+        "        window.parent.postMessage({ type: 'PRISM_REQUEST_ROM' }, '*');",
+        "        const reqTimer = setInterval(() => window.parent.postMessage({ type: 'PRISM_REQUEST_ROM' }, '*'), 180);",
+        "      });",
+        "      blobMap[" + JSON.stringify(romKeyHint) + "] = URL.createObjectURL(new Blob([romBytes], { type: 'application/octet-stream' }));",
+        "    }",
+        "  }",
+        "  const entries = Object.entries(rawVfs);",
+        "  for (let idx = 0; idx < entries.length; idx++) {",
+        "    const [k, v] = entries[idx];",
+        "    setStatus('Preparing ' + k + ' (' + (idx + 1) + '/' + entries.length + ')…');",
+        "    try {",
+        "      const bytes = await unpackVfsEntry(v);",
+        "      const mime = k.endsWith('.js') ? 'text/javascript' : k.endsWith('.css') ? 'text/css' : k.endsWith('.json') ? 'application/json' : 'application/octet-stream';",
+        "      blobMap[k] = URL.createObjectURL(new Blob([bytes], { type: mime }));",
+        "    } catch (e) { console.error('[Arcadia VFS] Failed to unpack', k, e); }",
+        "  }",
+        "  function resolveVfsUrl(rawUrl) {",
+        "    let clean = String(rawUrl || '').split('?')[0].split('#')[0];",
+        "    if (!clean || clean.startsWith('blob:') || clean.startsWith('data:')) return null;",
+        "    try { clean = decodeURIComponent(clean); } catch (e) {}",
+        "    clean = clean.replace(/^\\.\\//, '');",
+        "    for (const [vfsKey, blobUrl] of Object.entries(blobMap)) {",
+        "      if (vfsKey && (clean === vfsKey || clean.endsWith('/' + vfsKey) || clean.endsWith(vfsKey))) return blobUrl;",
+        "    }",
+        "    if (clean.endsWith('-legacy-wasm.data')) {",
+        "      const modernKey = clean.replace('-legacy-wasm.data', '-wasm.data');",
+        "      for (const [vfsKey, blobUrl] of Object.entries(blobMap)) {",
+        "        if (vfsKey && (modernKey === vfsKey || modernKey.endsWith('/' + vfsKey) || modernKey.endsWith(vfsKey))) return blobUrl;",
+        "      }",
+        "    }",
+        "    return null;",
+        "  }",
+        "  function makeSyntheticFallbackResponse(urlStr) {",
+        "    const clean = String(urlStr || '').split('?')[0].split('#')[0].toLowerCase();",
+        "    if (clean.endsWith('version.json')) {",
+        "      return new Response(JSON.stringify({ version: '4.2.3', current_version: '4.2.3' }), { status: 200, headers: { 'Content-Type': 'application/json' } });",
+        "    }",
+        "    if (clean.includes('localization/') && clean.endsWith('.json')) {",
+        "      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });",
+        "    }",
+        "    if (clean.includes('compression/') && clean.endsWith('.js')) {",
+        "      return new Response('/* compression stub */', { status: 200, headers: { 'Content-Type': 'application/javascript' } });",
+        "    }",
+        "    return null;",
+        "  }",
+        "  function rewriteDomAssetNode(node) {",
+        "    if (!node || node.nodeType !== 1) return;",
+        "    if (node.tagName === 'SCRIPT' && node.src) {",
+        "      const mapped = resolveVfsUrl(node.getAttribute('src') || node.src);",
+        "      if (mapped) node.src = mapped;",
+        "    } else if (node.tagName === 'LINK' && node.href) {",
+        "      const mapped = resolveVfsUrl(node.getAttribute('href') || node.href);",
+        "      if (mapped) node.href = mapped;",
+        "    }",
+        "  }",
+        "  const origAppendChild = Node.prototype.appendChild;",
+        "  Node.prototype.appendChild = function(child) { rewriteDomAssetNode(child); return origAppendChild.call(this, child); };",
+        "  const origInsertBefore = Node.prototype.insertBefore;",
+        "  Node.prototype.insertBefore = function(child, ref) { rewriteDomAssetNode(child); return origInsertBefore.call(this, child, ref); };",
+        "  const origFetch = window.fetch.bind(window);",
+        "  window.fetch = async function(input, init) {",
+        "    const urlStr = typeof input === 'string' ? input : (input && input.url) || '';",
+        "    const mapped = resolveVfsUrl(urlStr);",
+        "    if (mapped) return origFetch(mapped, init);",
+        "    const clean = String(urlStr || '').split('?')[0].split('#')[0];",
+        "    if (clean && !clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('blob:') && !clean.startsWith('data:')) {",
+        "      const relPath = clean.replace(/^\\.\\//, '').replace(/^\\//, '');",
+        "      try {",
+        "        const cdnResp = await origFetch('https://cdn.emulatorjs.org/stable/data/' + relPath, init);",
+        "        if (cdnResp && cdnResp.ok) return cdnResp;",
+        "      } catch (e) {}",
+        "      const stub = makeSyntheticFallbackResponse(relPath);",
+        "      if (stub) return stub;",
+        "    }",
+        "    return origFetch(input, init);",
+        "  };",
+        "  const emptyJsonBlobUrl = URL.createObjectURL(new Blob(['{}'], { type: 'application/json' }));",
+        "  const versionJsonBlobUrl = URL.createObjectURL(new Blob([JSON.stringify({ version: '4.2.3', current_version: '4.2.3' })], { type: 'application/json' }));",
+        "  const origXhrOpen = XMLHttpRequest.prototype.open;",
+        "  XMLHttpRequest.prototype.open = function(method, url, ...rest) {",
+        "    const mapped = resolveVfsUrl(url);",
+        "    if (mapped) return origXhrOpen.call(this, method, mapped, ...rest);",
+        "    const clean = String(url || '').split('?')[0].split('#')[0];",
+        "    if (clean && !clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('blob:') && !clean.startsWith('data:')) {",
+        "      const relPath = clean.replace(/^\\.\\//, '').replace(/^\\//, '');",
+        "      if (relPath.toLowerCase().endsWith('version.json')) return origXhrOpen.call(this, method, versionJsonBlobUrl, ...rest);",
+        "      if (relPath.toLowerCase().includes('localization/') && relPath.toLowerCase().endsWith('.json')) return origXhrOpen.call(this, method, emptyJsonBlobUrl, ...rest);",
+        "      return origXhrOpen.call(this, method, 'https://cdn.emulatorjs.org/stable/data/' + relPath, ...rest);",
+        "    }",
+        "    return origXhrOpen.call(this, method, url, ...rest);",
+        "  };",
+        "  window.EJS_player = '#game';",
+        "  window.EJS_core = " + JSON.stringify(coreName) + ";",
+        "  window.EJS_gameName = " + JSON.stringify(romKeyHint || gameTitle) + ";",
+        "  window.EJS_gameUrl = blobMap[" + JSON.stringify(romKeyHint) + "] || (Object.entries(blobMap).find(([k]) => !k.endsWith('.js') && !k.endsWith('.css') && !k.endsWith('.json') && !k.startsWith('cores/')) || [])[1] || '';",
+        "  window.EJS_pathtodata = '';",
+        "  window.EJS_startOnLoaded = true;",
+        "  setStatus('Starting ' + " + JSON.stringify(gameTitle) + " + '…');",
+        "  if (blobMap['emulator.min.css']) {",
+        "    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = blobMap['emulator.min.css']; document.head.appendChild(link);",
+        "  }",
+        "  const loadScriptSeq = (src) => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.body.appendChild(s); });",
+        "  try {",
+        "    if (blobMap['loader.js']) {",
+        "      await loadScriptSeq(blobMap['loader.js']);",
+        "    } else if (blobMap['emulator.min.js']) {",
+        "      await loadScriptSeq(blobMap['emulator.min.js']);",
+        "    } else {",
+        "      throw new Error('Missing loader.js / emulator.min.js in VFS bundle');",
+        "    }",
+        "    setTimeout(clearStatus, 650);",
+        "  } catch (bootErr) {",
+        "    console.error('[Arcadia Boot Error]', bootErr);",
+        "    setStatus('Boot error: ' + (bootErr && bootErr.message || bootErr));",
+        "  }",
+        "})();"
+      ].join('\n');
+    }
+
+    function buildArcadiaRuntimeBridge(gameId, gameTitle, systemId, coreName, isPrismVfs) {
+      const safeFnId = gameId.replace(/[^a-zA-Z0-9_]/g, '_');
+      return [
+        "(function __ArcadiaBridge_" + safeFnId + "() {",
+        "  window.__PRISM_HUB_SECTION__ = { gameId: " + JSON.stringify(gameId) + ", title: " + JSON.stringify(gameTitle) + ", system: " + JSON.stringify(systemId) + ", core: " + JSON.stringify(coreName) + " };",
+        "  const __activeAudioContexts = [];",
+        "  const __activeBlobUrls = [];",
+        "  let __parentIsFullscreen = false;",
+        "  let __html5SpeedMultiplier = 1;",
+        "",
+        "  const OrigAudioContext = window.AudioContext || window.webkitAudioContext;",
+        "  if (OrigAudioContext && !OrigAudioContext.__prismPatched) {",
+        "    const PatchedAudioContext = function(...args) { const ctx = new OrigAudioContext(...args); __activeAudioContexts.push(ctx); return ctx; };",
+        "    PatchedAudioContext.prototype = OrigAudioContext.prototype;",
+        "    PatchedAudioContext.__prismPatched = true;",
+        "    window.AudioContext = window.webkitAudioContext = PatchedAudioContext;",
+        "  }",
+        "  const origCreateObjectURL = URL.createObjectURL.bind(URL);",
+        "  URL.createObjectURL = function(obj) { const url = origCreateObjectURL(obj); __activeBlobUrls.push(url); return url; };",
+        "",
+        "  // Fallback interceptor for optional EmulatorJS metadata/localization requests",
+        "  const __bridgeOrigFetch = window.fetch.bind(window);",
+        "  window.fetch = async function(input, init) {",
+        "    try {",
+        "      const resp = await __bridgeOrigFetch(input, init);",
+        "      if (resp && resp.ok) return resp;",
+        "    } catch (e) {}",
+        "    const urlStr = typeof input === 'string' ? input : (input && input.url) || '';",
+        "    const clean = String(urlStr || '').split('?')[0].split('#')[0].toLowerCase();",
+        "    if (clean.endsWith('version.json')) {",
+        "      return new Response(JSON.stringify({ version: '4.2.3', current_version: '4.2.3' }), { status: 200, headers: { 'Content-Type': 'application/json' } });",
+        "    }",
+        "    if (clean.includes('localization/') && clean.endsWith('.json')) {",
+        "      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });",
+        "    }",
+        "    if (clean.includes('compression/') && clean.endsWith('.js')) {",
+        "      return new Response('/* compression stub */', { status: 200, headers: { 'Content-Type': 'application/javascript' } });",
+        "    }",
+        "    return __bridgeOrigFetch(input, init);",
+        "  };",
+        "",
+        "  // Delegate EmulatorJS bottom fullscreen button directly to Arcadia's clean fullscreen mode",
+        "  function delegateFullscreen(desired) {",
+        "    __parentIsFullscreen = desired;",
+        "    window.parent.postMessage({ type: 'PRISM_TOGGLE_FULLSCREEN', desired: desired }, '*');",
+        "    try { document.dispatchEvent(new Event('fullscreenchange')); } catch (e) {}",
+        "    return Promise.resolve();",
+        "  }",
+        "  ['requestFullscreen', 'webkitRequestFullscreen', 'mozRequestFullScreen', 'msRequestFullscreen'].forEach(fn => {",
+        "    try { Element.prototype[fn] = function() { return delegateFullscreen(true); }; } catch (e) {}",
+        "  });",
+        "  ['exitFullscreen', 'webkitExitFullscreen', 'mozCancelFullScreen', 'msExitFullscreen'].forEach(fn => {",
+        "    try { Document.prototype[fn] = function() { return delegateFullscreen(false); }; } catch (e) {}",
+        "  });",
+        "  try {",
+        "    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => (__parentIsFullscreen ? document.body : null) });",
+        "    Object.defineProperty(document, 'webkitFullscreenElement', { configurable: true, get: () => (__parentIsFullscreen ? document.body : null) });",
+        "  } catch (e) {}",
+        "",
+        "  // HTML5 RAF Speed Boost Hook",
+        "  const origRAF = window.requestAnimationFrame.bind(window);",
+        "  window.requestAnimationFrame = function(cb) {",
+        "    if (__html5SpeedMultiplier > 1) {",
+        "      return origRAF(function(ts) { cb(ts); origRAF(cb); });",
+        "    }",
+        "    return origRAF(cb);",
+        "  };",
+        "",
+        "  function bytesToB64(bytes) {",
+        "    if (!bytes || !bytes.length) return '';",
+        "    let bin = '';",
+        "    const chunk = 0x8000;",
+        "    for (let i = 0; i < bytes.length; i += chunk) {",
+        "      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));",
+        "    }",
+        "    return btoa(bin);",
+        "  }",
+        "  function b64ToBytes(b64) {",
+        "    const bin = atob(b64);",
+        "    const out = new Uint8Array(bin.length);",
+        "    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);",
+        "    return out;",
+        "  }",
+        "",
+        "  function captureScreenshotDataUrl() {",
+        "    try {",
+        "      const canvas = document.querySelector('canvas');",
+        "      if (canvas && canvas.width > 0 && canvas.height > 0) {",
+        "        return canvas.toDataURL('image/webp', 0.62);",
+        "      }",
+        "    } catch (e) {}",
+        "    return '';",
+        "  }",
+        "",
+        "  function captureEmulatorSavePayload() {",
+        "    let stateB64 = '';",
+        "    let sramB64 = '';",
+        "    try {",
+        "      const gm = window.EJS_emulator && window.EJS_emulator.gameManager;",
+        "      if (gm && typeof gm.getState === 'function') {",
+        "        const st = gm.getState();",
+        "        if (st && st.length) stateB64 = bytesToB64(new Uint8Array(st));",
+        "      }",
+        "      if (gm && typeof gm.getSaveFile === 'function') {",
+        "        const sv = gm.getSaveFile();",
+        "        if (sv && sv.length) sramB64 = bytesToB64(new Uint8Array(sv));",
+        "      }",
+        "    } catch (e) {}",
+        "    return { stateB64, sramB64, thumbnail: captureScreenshotDataUrl() };",
+        "  }",
+        "",
+        "  function applyEmulatorCheats(cheats) {",
+        "    if (!Array.isArray(cheats)) return;",
+        "    let turbo = false, slowmo = false, htmlBoost = false;",
+        "    const gm = window.EJS_emulator && window.EJS_emulator.gameManager;",
+        "    if (gm && typeof gm.resetCheat === 'function') {",
+        "      try { gm.resetCheat(); } catch (e) {}",
+        "    }",
+        "    let activeIdx = 0;",
+        "    for (const c of cheats) {",
+        "      if (!c.enabled) continue;",
+        "      if (c.code === '__ARCADIA_TURBO_2X__') { turbo = true; continue; }",
+        "      if (c.code === '__ARCADIA_SLOWMO__') { slowmo = true; continue; }",
+        "      if (c.code === '__ARCADIA_HTML5_BOOST__') { htmlBoost = true; continue; }",
+        "      if (gm && typeof gm.setCheat === 'function') {",
+        "        try { gm.setCheat(activeIdx++, 1, String(c.code || '').replace(/\\r?\\n/g, '+')); } catch (e) {}",
+        "      }",
+        "    }",
+        "    __html5SpeedMultiplier = htmlBoost ? 1.5 : 1;",
+        "    if (gm && typeof gm.toggleFastForward === 'function') {",
+        "      try { gm.toggleFastForward(turbo ? 1 : 0); } catch (e) {}",
+        "    }",
+        "    if (gm && typeof gm.toggleSlowMotion === 'function') {",
+        "      try { gm.toggleSlowMotion(slowmo ? 1 : 0); } catch (e) {}",
+        "    }",
+        "  }",
+        "",
+        "  // Hotkeys inside game frame",
+        "  window.addEventListener('keydown', function(e) {",
+        "    if (e.altKey && (e.key === 'm' || e.key === 'M')) {",
+        "      e.preventDefault();",
+        "      window.parent.postMessage({ type: 'PRISM_HUB_RETURN', gameId: " + JSON.stringify(gameId) + " }, '*');",
+        "    } else if (e.key === 'F5') {",
+        "      e.preventDefault();",
+        "      window.parent.postMessage({ type: 'PRISM_HOTKEY_QUICKSAVE' }, '*');",
+        "    } else if (e.key === 'F8') {",
+        "      e.preventDefault();",
+        "      window.parent.postMessage({ type: 'PRISM_HOTKEY_QUICKLOAD' }, '*');",
+        "    }",
+        "  });",
+        "",
+        "  window.addEventListener('message', function(e) {",
+        "    const msg = e.data || {};",
+        "    if (msg.type === 'PRISM_FULLSCREEN_SYNC') {",
+        "      __parentIsFullscreen = Boolean(msg.isFullscreen);",
+        "      try { document.dispatchEvent(new Event('fullscreenchange')); } catch (err) {}",
+        "    } else if (msg.type === 'PRISM_CAPTURE_SAVE') {",
+        "      const payload = captureEmulatorSavePayload();",
+        "      window.parent.postMessage({",
+        "        type: 'PRISM_SAVE_CAPTURED',",
+        "        gameId: " + JSON.stringify(gameId) + ",",
+        "        mode: msg.mode || 'autosave',",
+        "        slotIndex: msg.slotIndex,",
+        "        payload: payload",
+        "      }, '*');",
+        "    } else if (msg.type === 'PRISM_LOAD_STATE' && msg.stateB64) {",
+        "      try {",
+        "        const gm = window.EJS_emulator && window.EJS_emulator.gameManager;",
+        "        if (gm && typeof gm.loadState === 'function') {",
+        "          gm.loadState(b64ToBytes(msg.stateB64));",
+        "        }",
+        "      } catch (err) { console.warn('[Arcadia] Load state error:', err); }",
+        "    } else if (msg.type === 'PRISM_INJECT_SRAM' && msg.sramB64) {",
+        "      window.__ARCADIA_INITIAL_SRAM__ = b64ToBytes(msg.sramB64);",
+        "    } else if (msg.type === 'PRISM_APPLY_CHEATS') {",
+        "      applyEmulatorCheats(msg.cheats);",
+        "    } else if (msg.type === 'PRISM_HUB_TEARDOWN') {",
+        "      const finalPayload = captureEmulatorSavePayload();",
+        "      window.parent.postMessage({ type: 'PRISM_FINAL_EXIT_SAVE', gameId: " + JSON.stringify(gameId) + ", payload: finalPayload }, '*');",
+        "      __activeAudioContexts.forEach(ctx => { try { ctx.suspend(); ctx.close(); } catch(err){} });",
+        "      __activeBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch(err){} });",
+        "      if (window.EJS_emulator && typeof window.EJS_emulator.pause === 'function') {",
+        "        try { window.EJS_emulator.pause(); } catch(err){}",
+        "      }",
+        "    }",
+        "  });",
+        "",
+        "  // Periodically notify parent once EmulatorJS finishes booting so initial SRAM & active cheats apply",
+        "  let __bootNotified = false;",
+        "  const __bootPoll = setInterval(() => {",
+        "    const gm = window.EJS_emulator && window.EJS_emulator.gameManager;",
+        "    if (gm && !__bootNotified) {",
+        "      __bootNotified = true;",
+        "      clearInterval(__bootPoll);",
+        "      if (window.__ARCADIA_INITIAL_SRAM__ && typeof gm.loadSaveFiles === 'function') {",
+        "        try { gm.loadSaveFiles(window.__ARCADIA_INITIAL_SRAM__); } catch (e) {}",
+        "      }",
+        "      window.parent.postMessage({ type: 'PRISM_GAME_BOOTED', gameId: " + JSON.stringify(gameId) + " }, '*');",
+        "    }",
+        "  }, 500);",
+        "  setTimeout(() => { if (!__bootNotified) window.parent.postMessage({ type: 'PRISM_GAME_BOOTED', gameId: " + JSON.stringify(gameId) + " }, '*'); }, 2500);",
+        "})();"
+      ].join('\n');
+    }
+
+    function extractAndRecompileScripts(gameId, gameTitle, systemId, coreName, rawHtmlText, isPrismVfs, vfsManifest) {
+      vfsManifest = vfsManifest || {};
+      const scriptRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
+      const originalScripts = [];
+      let match;
+
+      while ((match = scriptRegex.exec(rawHtmlText)) !== null) {
+        const attrs = match[1] || '';
+        const body = (match[2] || '').trim();
+        if (/id\s*=\s*["']vfs-data["']/i.test(attrs)) continue;
+        if (/id\s*=\s*["']prism-hub-bundle["']/i.test(attrs)) continue;
+        if (/id\s*=\s*["']prism-hub-recompiled-bridge["']/i.test(attrs)) continue;
+        if (/type\s*=\s*["']application\/(json|prism-)/i.test(attrs)) continue;
+        if (!/src\s*=/i.test(attrs) && body) {
+          originalScripts.push(body);
+        }
+      }
+
+      const romKeysList = Object.entries(vfsManifest)
+        .filter(([, info]) => info.category !== 'engine-core')
+        .map(([k]) => k);
+
+      const bridgeHeader = buildArcadiaRuntimeBridge(gameId, gameTitle, systemId, coreName, isPrismVfs);
+      let bootBody = '';
+      if (originalScripts.length > 0) {
+        bootBody = originalScripts.join('\n\n/* --- Game Runtime Segment --- */\n\n');
+      } else if (isPrismVfs) {
+        bootBody = generateFallbackPrismVfsBootScript(gameTitle, systemId, coreName, romKeysList[0] || (gameTitle + '.z64'));
+      }
+
+      return {
+        originalScriptCount: originalScripts.length,
+        recompiledHeader: bridgeHeader,
+        fullRecompiledScript: bridgeHeader + '\n\n' + bootBody
+      };
+    }
+
+    /*************************************************************************
+     * 8. GAME INGESTION (PRISM HTML, EMULATORJS HTML & RAW ROMS)
+     *************************************************************************/
+    function parseAndIngestHtmlGame(fileName, rawHtmlText) {
+      let rawTitle = fileName.replace(/\.(html|htm)$/i, '');
+      const titleMatch = rawHtmlText.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (titleMatch && titleMatch[1].trim()) {
+        rawTitle = titleMatch[1].trim();
+      }
+
+      const vfsTagMatch = /<script\b(?=[^>]*\bid\s*=\s*["']vfs-data["'])[^>]*>/i.exec(rawHtmlText);
+      const vfsTagStart = vfsTagMatch ? vfsTagMatch.index : -1;
+      let isPrismVfs = false;
+      let vfsManifest = {};
+      let htmlTemplate = rawHtmlText;
+      let detectedCore = null;
+      let detectedRomName = rawTitle;
+
+      if (vfsTagStart !== -1) {
+        const jsonStart = rawHtmlText.indexOf('>', vfsTagStart) + 1;
+        const closeTagMatch = /<\/script\s*>/i.exec(rawHtmlText.slice(jsonStart));
+        const scriptEnd = closeTagMatch ? jsonStart + closeTagMatch.index : -1;
+
+        if (jsonStart > 0 && scriptEnd !== -1) {
+          const rawJsonStr = rawHtmlText.slice(jsonStart, scriptEnd).trim();
+          try {
+            const parsedVfs = JSON.parse(rawJsonStr);
+            isPrismVfs = true;
+            htmlTemplate = rawHtmlText.slice(0, jsonStart) + '__PRISM_HUB_VFS_INJECT__' + rawHtmlText.slice(scriptEnd);
+
+            for (const [vfsKey, vfsVal] of Object.entries(parsedVfs)) {
+              const strVal = typeof vfsVal === 'string' ? vfsVal : JSON.stringify(vfsVal);
+              const byteSize = strVal.length;
+
+              if (vfsKey.startsWith('cores/')) {
+                const coreMatch = vfsKey.match(/^cores\/([a-zA-Z0-9_]+)-wasm/);
+                if (coreMatch) detectedCore = coreMatch[1];
+              } else if (!SHARED_ENGINE_KEYS.has(vfsKey) && !vfsKey.startsWith('compression/') && !vfsKey.startsWith('localization/')) {
+                detectedRomName = vfsKey;
+              }
+
+              const isSharedEngineFile = SHARED_ENGINE_KEYS.has(vfsKey) || vfsKey.startsWith('cores/') || vfsKey.startsWith('compression/') || vfsKey.startsWith('localization/');
+
+              if (isSharedEngineFile || byteSize > 1024) {
+                const hashId = computeAssetFingerprint(vfsKey, strVal);
+                if (!hubState.sharedAssets[hashId]) {
+                  hubState.sharedAssets[hashId] = {
+                    keyHint: vfsKey,
+                    category: isSharedEngineFile ? 'engine-core' : 'game-rom',
+                    content: strVal,
+                    size: byteSize
+                  };
+                }
+                vfsManifest[vfsKey] = {
+                  mode: 'shared',
+                  category: isSharedEngineFile ? 'engine-core' : 'game-rom',
+                  assetId: hashId,
+                  size: byteSize
+                };
+              } else {
+                vfsManifest[vfsKey] = {
+                  mode: 'inline',
+                  category: 'config',
+                  value: vfsVal,
+                  size: byteSize
+                };
+              }
+            }
+          } catch (err) {
+            console.warn('VFS parse fallback:', err);
+          }
+        }
+      }
+
+      let detectedSystem = 'html5';
+      const extFromTitle = (rawTitle.match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase();
+      const extFromRom = (detectedRomName.match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase();
+      const targetExt = extFromRom || extFromTitle;
+
+      if (detectedCore) {
+        const byCore = SYSTEMS_DB.find(sys => sys.cores.some(c => detectedCore.toLowerCase().includes(c.toLowerCase())));
+        if (byCore) detectedSystem = byCore.id;
+      }
+      if (detectedSystem === 'html5' && targetExt) {
+        const byExt = SYSTEMS_DB.find(sys => sys.exts.includes(targetExt));
+        if (byExt) detectedSystem = byExt.id;
+      }
+      if (detectedSystem === 'html5') {
+        const ejsCoreMatch = rawHtmlText.match(/EJS_core\s*=\s*['"]([^'"]+)['"]/i);
+        if (ejsCoreMatch) {
+          const cName = ejsCoreMatch[1].toLowerCase();
+          const byEjs = SYSTEMS_DB.find(sys => sys.id.toLowerCase() === cName || sys.cores.includes(cName));
+          if (byEjs) detectedSystem = byEjs.id;
+        }
+      }
+
+      const cleanTitle = rawTitle
+        .replace(/\.(z64|n64|v64|nes|sfc|smc|gba|gb|gbc|nds|bin|iso|chd|pbp|md|gen|sms|gg|pce|zip|7z|html|htm)$/i, '')
+        .replace(/_/g, ' ')
+        .trim();
+
+      const gameId = 'game_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const finalCore = detectedCore || (isPrismVfs ? getSystemMeta(detectedSystem).cores[0] : 'native_html5');
+
+      const compiledScriptInfo = extractAndRecompileScripts(
+        gameId,
+        cleanTitle || 'Untitled Game',
+        detectedSystem,
+        finalCore,
+        rawHtmlText,
+        isPrismVfs,
+        vfsManifest
+      );
+
+      let recompiledHtmlTemplate = htmlTemplate;
+      const bridgeScriptTag = '\n<script id="prism-hub-recompiled-bridge">\n' + compiledScriptInfo.recompiledHeader + '\n<\/script>\n';
+      if (recompiledHtmlTemplate.includes('</head>')) {
+        recompiledHtmlTemplate = recompiledHtmlTemplate.replace('</head>', () => bridgeScriptTag + '</head>');
+      } else {
+        recompiledHtmlTemplate = bridgeScriptTag + recompiledHtmlTemplate;
+      }
+
+      const gameObj = {
+        id: gameId,
+        title: cleanTitle || 'Untitled Game',
+        rawFileName: fileName,
+        romName: detectedRomName,
+        system: detectedSystem,
+        core: finalCore,
+        isPrismVfs: isPrismVfs,
+        vfsManifest: vfsManifest,
+        recompiledScript: compiledScriptInfo.fullRecompiledScript,
+        originalScriptCount: compiledScriptInfo.originalScriptCount,
+        htmlTemplate: recompiledHtmlTemplate,
+        totalSize: rawHtmlText.length,
+        addedAt: Date.now(),
+        coverUrl: ''
+      };
+
+      autodetectCheatsForGame(gameObj);
+      return gameObj;
+    }
+
+    const RAW_ROM_URL_PLACEHOLDER = '__PRISM_RAW_ROM_URL__';
+    const RAW_ROM_CORE_PLACEHOLDER = '__PRISM_RAW_ROM_CORE__';
+
+    function encodeBytesToBase64(uint8Bytes) {
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < uint8Bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, uint8Bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    }
+
+    function decodeBase64ToBytes(b64) {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    async function resolveRomBytesAsync(game) {
+      if (game.romBytes) return game.romBytes;
+      if (game.romDiskFile && romsDirHandle) {
+        game.romBytes = await readRomBytesFromDisk(game.romDiskFile);
+        return game.romBytes;
+      }
+      if (game.romBase64) {
+        game.romBytes = decodeBase64ToBytes(game.romBase64);
+      }
+      return game.romBytes || new Uint8Array(0);
+    }
+
+    function releaseDiskBackedRomBytes(game) {
+      if (game && game.romDiskFile) game.romBytes = null;
+    }
+
+    function buildRawRomGameObject(fileName, uint8Bytes) {
+      const ext = (fileName.split('.').pop() || '').toLowerCase();
+      const matchedSystem = SYSTEMS_DB.find(s => s.exts.includes(ext) && s.id !== 'html5') || SYSTEMS_DB[0];
+      const defaultCore = matchedSystem.cores[0];
+      const cleanTitle = fileName.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+      const gameId = 'rom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const bridgeCode = buildArcadiaRuntimeBridge(gameId, cleanTitle, matchedSystem.id, defaultCore, false);
+
+      const romRunnerHtml = [
+        '<!DOCTYPE html>',
+        '<html>',
+        '<head>',
+        '<meta charset="utf-8">',
+        '<title>' + escapeHtml(cleanTitle) + '</title>',
+        '<style>html,body,#game{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;color:#fff;font-family:system-ui,sans-serif}</style>',
+        '<script id="prism-hub-recompiled-bridge">\n' + bridgeCode + '\n<\/script>',
+        '</head>',
+        '<body>',
+        '<div id="game"><div id="arcadia-raw-loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#05070d;color:#e2e8f0;font:500 14px system-ui,sans-serif">Loading ' + escapeHtml(cleanTitle) + '…</div></div>',
+        '<script id="prism-raw-rom-online-boot">',
+        '(function(){',
+        '  let started = false;',
+        '  function startWithRomUrl(romUrl, romFileName) {',
+        '    if (started) return;',
+        '    started = true;',
+        '    const loaderEl = document.getElementById("arcadia-raw-loading");',
+        '    if (loaderEl) loaderEl.remove();',
+        '    const primaryDataPath = "https://cdn.emulatorjs.org/stable/data/";',
+        '    const fallbackDataPath = "https://cdn.jsdelivr.net/gh/EmulatorJS/EmulatorJS@4.2.3/data/";',
+        '    window.EJS_player = "#game";',
+        '    window.EJS_core = "' + RAW_ROM_CORE_PLACEHOLDER + '";',
+        '    window.EJS_gameName = romFileName || ' + JSON.stringify(fileName) + ';',
+        '    window.EJS_gameUrl = romUrl;',
+        '    window.EJS_pathtodata = primaryDataPath;',
+        '    window.EJS_startOnLoaded = true;',
+        '    const script = document.createElement("script");',
+        '    script.src = primaryDataPath + "loader.js";',
+        '    script.onerror = function() {',
+        '      window.EJS_pathtodata = fallbackDataPath;',
+        '      const fallbackScript = document.createElement("script");',
+        '      fallbackScript.src = fallbackDataPath + "loader.js";',
+        '      fallbackScript.onerror = function() {',
+        '        const g = document.getElementById("game");',
+        '        if (g) g.innerHTML = "<div style=\\"display:flex;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;color:#e2e8f0\\"><div><h3 style=\\"margin:0 0 8px\\">Unable to reach EmulatorJS CDN</h3><p style=\\"margin:0;font-size:13px;color:#94a3b8\\">Check your internet connection or pre-bundle the core in Arcadia &rarr; Cores for offline play.</p></div></div>";',
+        '      };',
+        '      document.body.appendChild(fallbackScript);',
+        '    };',
+        '    document.body.appendChild(script);',
+        '  }',
+        '  const inlineUrl = "' + RAW_ROM_URL_PLACEHOLDER + '";',
+        '  if (inlineUrl && !inlineUrl.startsWith("__PRISM_")) {',
+        '    startWithRomUrl(inlineUrl, ' + JSON.stringify(fileName) + ');',
+        '  } else {',
+        '    window.addEventListener("message", function onRomMsg(ev) {',
+        '      if (ev.data && ev.data.type === "PRISM_INIT_ROM" && ev.data.bytes) {',
+        '        window.removeEventListener("message", onRomMsg);',
+        '        clearInterval(reqTimer);',
+        '        const localRomUrl = URL.createObjectURL(new Blob([ev.data.bytes], { type: "application/octet-stream" }));',
+        '        startWithRomUrl(localRomUrl, ev.data.fileName || ' + JSON.stringify(fileName) + ');',
+        '      }',
+        '    });',
+        '    window.parent.postMessage({ type: "PRISM_REQUEST_ROM" }, "*");',
+        '    const reqTimer = setInterval(function(){ if (!started) window.parent.postMessage({ type: "PRISM_REQUEST_ROM" }, "*"); else clearInterval(reqTimer); }, 180);',
+        '  }',
+        '})();',
+        '<\/script>',
+        '</body>',
+        '</html>'
+      ].join('\n');
+
+      const compiled = extractAndRecompileScripts(gameId, cleanTitle, matchedSystem.id, defaultCore, romRunnerHtml, false, {});
+
+      const gameObj = {
+        id: gameId,
+        title: cleanTitle,
+        rawFileName: fileName,
+        romName: fileName,
+        system: matchedSystem.id,
+        core: defaultCore,
+        isPrismVfs: false,
+        isRawRom: true,
+        romBytes: uint8Bytes,
+        vfsManifest: {},
+        recompiledScript: compiled.fullRecompiledScript,
+        originalScriptCount: compiled.originalScriptCount,
+        htmlTemplate: romRunnerHtml,
+        totalSize: uint8Bytes.length,
+        addedAt: Date.now(),
+        coverUrl: ''
+      };
+
+      autodetectCheatsForGame(gameObj);
+      return gameObj;
+    }
+
+    function loadEmbeddedBundle() {
+      try {
+        const bundleEl = document.getElementById('prism-hub-bundle');
+        if (bundleEl && bundleEl.textContent.trim()) {
+          const parsed = JSON.parse(bundleEl.textContent);
+          if (parsed && typeof parsed === 'object') {
+            hubState = Object.assign(hubState, parsed);
+          }
+        }
+      } catch (e) {
+        console.warn('Bundle load fallback:', e);
+      }
+      if (!Array.isArray(hubState.games)) hubState.games = [];
+      if (!hubState.sharedAssets) hubState.sharedAssets = {};
+      if (!hubState.saves) hubState.saves = {};
+      if (!hubState.cheats) hubState.cheats = {};
+      for (const g of hubState.games) {
+        autodetectCheatsForGame(g);
+      }
+    }
+
+    function syncSectionedDomTree() {
+      const sharedSection = document.getElementById('prism-shared-engine-section');
+      const gamesRegistry = document.getElementById('prism-games-registry-section');
+      if (!sharedSection || !gamesRegistry) return;
+
+      sharedSection.innerHTML = Object.entries(hubState.sharedAssets || {}).map(([assetId, asset]) => {
+        return '<script type="application/prism-shared-vfs" data-asset-id="' + escapeHtml(assetId) + '" data-key-hint="' + escapeHtml(asset.keyHint || '') + '" data-size="' + (asset.size || 0) + '"><\/script>';
+      }).join('\n');
+
+      gamesRegistry.innerHTML = (hubState.games || []).map(game => {
+        const safeManifest = JSON.stringify(game.vfsManifest || {}).replace(/<\/script>/gi, '<\\/script>');
+        const safeRecompiled = (game.recompiledScript || '').replace(/<\/script>/gi, '<\\/script>');
+        return [
+          '<article id="prism-section-' + escapeHtml(game.id) + '" class="prism-game-section" data-game-id="' + escapeHtml(game.id) + '" data-system="' + escapeHtml(game.system) + '" data-core="' + escapeHtml(game.core) + '">',
+          '  <script type="application/prism-vfs-manifest">' + safeManifest + '<\/script>',
+          '  <script type="application/prism-recompiled-script">' + safeRecompiled + '<\/script>',
+          '</article>'
+        ].join('\n');
+      }).join('\n');
+    }
+
+    /*************************************************************************
+     * 9. FILE UPLOAD & DRAG-AND-DROP WORKFLOW
+     *************************************************************************/
+    async function processUploadedFiles(fileList) {
+      if (!fileList || fileList.length === 0) return;
+      let addedCount = 0;
+
+      for (const file of Array.from(fileList)) {
+        const lower = file.name.toLowerCase();
+        try {
+          if (lower.endsWith('.html') || lower.endsWith('.htm')) {
+            const text = await file.text();
+
+            if (text.includes('<script id="prism-hub-bundle"')) {
+              const match = text.match(/<script id="prism-hub-bundle"[^>]*>([\s\S]*?)<\/script>/i);
+              if (match && match[1]) {
+                const importedBundle = JSON.parse(match[1]);
+                if (importedBundle.sharedAssets) Object.assign(hubState.sharedAssets, importedBundle.sharedAssets);
+                if (importedBundle.saves) Object.assign(hubState.saves, importedBundle.saves);
+                if (importedBundle.cheats) Object.assign(hubState.cheats, importedBundle.cheats);
+                if (Array.isArray(importedBundle.games)) {
+                  for (const g of importedBundle.games) {
+                    autodetectCheatsForGame(g);
+                    hubState.games.unshift(g);
+                    addedCount++;
+                  }
+                  pruneOrphanedSharedAssets();
+                  showToast('Merged ' + importedBundle.games.length + ' games from Arcadia bundle!', 'success');
+                  continue;
+                }
+              }
+            }
+
+            const newGame = parseAndIngestHtmlGame(file.name, text);
+            hubState.games.unshift(newGame);
+            addedCount++;
+          } else {
+            const buf = await file.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            const romGame = buildRawRomGameObject(file.name, bytes);
+            if (romsDirHandle) {
+              const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+              romGame.romDiskFile = await writeRomBytesToDisk(romGame.id, ext, bytes);
+              romGame.romBytes = null;
+            }
+            hubState.games.unshift(romGame);
+            addedCount++;
+          }
+        } catch (err) {
+          console.error('Error ingesting file:', file.name, err);
+          showToast('Could not parse ' + file.name, 'error');
+        }
+      }
+
+      if (addedCount > 0) {
+        pruneOrphanedSharedAssets();
+        renderAll();
+        if (libraryDirHandle) {
+          await saveLibraryJsonToFolder();
+          showToast('Added ' + addedCount + ' game' + (addedCount > 1 ? 's' : '') + ' to your Library Folder.', 'success');
+        } else {
+          showToast('Added ' + addedCount + ' game' + (addedCount > 1 ? 's' : '') + ' to Arcadia!', 'success');
+        }
+      }
+    }
+
+    function handleFileInput(event) {
+      processUploadedFiles(event.target.files);
+      event.target.value = '';
+    }
+
+    window.addEventListener('dragover', e => {
+      e.preventDefault();
+      const overlay = document.getElementById('drop-overlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    });
+
+    window.addEventListener('dragleave', e => {
+      if (e.relatedTarget === null || e.clientX <= 0 || e.clientY <= 0) {
+        const overlay = document.getElementById('drop-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    });
+
+    window.addEventListener('drop', e => {
+      e.preventDefault();
+      const overlay = document.getElementById('drop-overlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+      if (e.dataTransfer && e.dataTransfer.files) {
+        processUploadedFiles(e.dataTransfer.files);
+      }
+    });
+
+    /*************************************************************************
+     * 10. SANDBOXED GAME LAUNCHER, AUTOSAVE LOOP & CLEAN FULLSCREEN
+     *************************************************************************/
+    async function buildPlayableHtmlDocument(game, opts) {
+      opts = opts || {};
+      let docText = game.htmlTemplate || '';
+      const targetCore = game.core || getSystemMeta(game.system).cores[0];
+
+      if (game.isRawRom) {
+        docText = docText.replace(RAW_ROM_CORE_PLACEHOLDER, () => targetCore);
+
+        // If this core + EmulatorJS runtime are bundled in the Hub's sharedAssets pool, mount them offline!
+        // (Matched by this script's stable id rather than its CDN-URL text, which
+        // moved around when the CDN-fallback logic above was added and stopped a
+        // plain string search from ever finding it — so this swap was silently
+        // never firing, and bundling a core did nothing for raw-ROM games.)
+        const onlineBootRegex = /<script id="prism-raw-rom-online-boot">[\s\S]*?<\/script>/i;
+        if (!opts.forExport && isCoreBundled(targetCore) && onlineBootRegex.test(docText)) {
+          const offlineVfs = {};
+          for (const asset of Object.values(hubState.sharedAssets || {})) {
+            if (!asset || asset.category !== 'engine-core' || !asset.keyHint || !asset.content) continue;
+            if (SHARED_ENGINE_KEYS.has(asset.keyHint) || asset.keyHint.startsWith('compression/') || asset.keyHint.startsWith('localization/') || asset.keyHint === 'version.json' || asset.keyHint.startsWith('cores/' + targetCore)) {
+              offlineVfs[asset.keyHint] = asset.content;
+            }
+          }
+          const serializedOfflineVfs = JSON.stringify(offlineVfs).replace(/<\/script>/gi, '<\\/script>');
+          const offlineBootScript = generateFallbackPrismVfsBootScript(game.title, game.system, targetCore, game.romName || 'game.rom');
+
+          // Build the ROM's blob: URL here in the hub itself (same technique as
+          // the online path below) and hand it to the offline boot script through
+          // a plain global instead of a postMessage round-trip. This only works
+          // because the game document is mounted with iframe.srcdoc (see
+          // mountGameIntoIframe), which makes the iframe genuinely same-origin
+          // with the hub — a blob: URL minted here would NOT be fetchable from a
+          // cross-origin iframe, which is exactly the failure mode closed off below.
+          const romBytesForOffline = await resolveRomBytesAsync(game);
+          if (activeRomBlobUrl) {
+            try { URL.revokeObjectURL(activeRomBlobUrl); } catch (e) {}
+            activeRomBlobUrl = null;
+          }
+          activeRomBlobUrl = URL.createObjectURL(new Blob([romBytesForOffline], { type: 'application/octet-stream' }));
+
+          const offlineMountBlock = [
+            '<script>window.__ARCADIA_PENDING_ROM__ = true; window.__ARCADIA_ROM_BLOB_URL__ = ' + JSON.stringify(activeRomBlobUrl) + ';<\/script>',
+            '<script id="vfs-data" type="application/json">' + serializedOfflineVfs + '<\/script>',
+            '<script id="prism-offline-core-loader">\n' + offlineBootScript + '\n<\/script>'
+          ].join('\n');
+
+          docText = docText.replace(onlineBootRegex, () => offlineMountBlock);
+        }
+      }
+
+      if (game.isRawRom && docText.includes(RAW_ROM_URL_PLACEHOLDER)) {
+        if (opts.forExport) {
+          const b64Rom = encodeBytesToBase64(await resolveRomBytesAsync(game));
+          const decodeExpr = '(function(){ var _b64="' + b64Rom + '"; var _bin=atob(_b64); ' +
+            'var _bytes=new Uint8Array(_bin.length); for (var _i=0;_i<_bin.length;_i++){ _bytes[_i]=_bin.charCodeAt(_i); } ' +
+            'return URL.createObjectURL(new Blob([_bytes],{type:"application/octet-stream"})); })()';
+          docText = docText.replace('"' + RAW_ROM_URL_PLACEHOLDER + '"', () => decodeExpr);
+        } else {
+          // Resolve the real bytes right now and hand the game page a blob: URL
+          // it can use immediately, instead of a sentinel string that depends on
+          // a postMessage round-trip to ever get replaced. That round-trip only
+          // gets consumed by a template that was built with its own "wait for
+          // PRISM_INIT_ROM" listener — any raw-ROM game added before that listener
+          // existed just assigns this value straight to EJS_gameUrl and moves on
+          // with nothing ever listening, so EmulatorJS silently boots against a
+          // garbage URL and the game sits on a black screen forever. Substituting
+          // a working blob URL directly here is correct for both an old game and
+          // a new one: an old template uses it immediately; a new template's own
+          // "if it doesn't look like a placeholder, start immediately" check also
+          // takes this branch immediately, since a real blob: URL never starts
+          // with "__PRISM_".
+          const bytes = await resolveRomBytesAsync(game);
+          if (activeRomBlobUrl) {
+            try { URL.revokeObjectURL(activeRomBlobUrl); } catch (e) {}
+            activeRomBlobUrl = null;
+          }
+          activeRomBlobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+          docText = docText.replace(RAW_ROM_URL_PLACEHOLDER, () => activeRomBlobUrl);
+        }
+      }
+
+      if (game.isPrismVfs && docText.includes('__PRISM_HUB_VFS_INJECT__')) {
+        const reconstructedVfs = {};
+        for (const [vfsKey, entry] of Object.entries(game.vfsManifest || {})) {
+          if (entry.mode === 'shared' && hubState.sharedAssets[entry.assetId] && hubState.sharedAssets[entry.assetId].content != null) {
+            reconstructedVfs[vfsKey] = hubState.sharedAssets[entry.assetId].content;
+          } else if (entry.mode === 'inline') {
+            reconstructedVfs[vfsKey] = entry.value;
+          }
+        }
+        const serializedVfs = JSON.stringify(reconstructedVfs).replace(/<\/script>/gi, '<\\/script>');
+        docText = docText.replace('__PRISM_HUB_VFS_INJECT__', () => serializedVfs);
+      }
+
+      // Strip restrictive CSP meta tags and any stale arcadia.local <base> tag
+      docText = docText.replace(/<meta[^>]*http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>/gi, '');
+      docText = docText.replace(/<base[^>]*href\s*=\s*["']https:\/\/arcadia\.local\/[^"']*["'][^>]*>/gi, '');
+
+      if (!/id\s*=\s*["']prism-hub-recompiled-bridge["']/i.test(docText)) {
+        const bridgeTag = '\n<script id="prism-hub-recompiled-bridge">\n' + buildArcadiaRuntimeBridge(game.id, game.title, game.system, targetCore, game.isPrismVfs) + '\n<\/script>\n';
+        if (docText.includes('</head>')) {
+          docText = docText.replace('</head>', () => bridgeTag + '</head>');
+        } else {
+          docText = bridgeTag + docText;
+        }
+      }
+
+      if (game.isPrismVfs && !/id\s*=\s*["']prism-hub-recompiled-runtime["']/i.test(docText) && (game.originalScriptCount === 0 || !game.originalScriptCount)) {
+        const runtimeScriptTag = '\n<script id="prism-hub-recompiled-runtime">\n' + (game.recompiledScript || '') + '\n<\/script>\n';
+        if (docText.includes('</body>')) {
+          docText = docText.replace('</body>', () => runtimeScriptTag + '</body>');
+        } else {
+          docText += runtimeScriptTag;
+        }
+      }
+
+      return docText;
+    }
+
+    async function launchGame(gameId, initialStateB64) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+
+      closeSavesModal();
+      closeCheatsModal();
+      closeInspectorModal();
+
+      activePlayingGameId = game.id;
+      pendingBootStatePayload = initialStateB64 || null;
+      const sys = getSystemMeta(game.system);
+
+      document.getElementById('player-system-badge').textContent = sys.short;
+      document.getElementById('player-game-title').textContent = game.title;
+      updatePlayerCheatBadge(game.id);
+
+      const rec = getGameSaveRecord(game.id);
+      const autoText = document.getElementById('player-autosave-text');
+      if (autoText) {
+        autoText.textContent = rec.autosave ? ('Autosaved ' + formatRelativeTime(rec.autosave.updatedAt)) : 'Autosave Active';
+      }
+
+      const playerView = document.getElementById('player-view');
+      playerView.classList.remove('hidden');
+      playerView.classList.add('flex');
+
+      await mountGameIntoIframe(game);
+      startAutosaveLoop();
+    }
+
+    async function mountGameIntoIframe(game) {
+      const wrapper = document.getElementById('iframe-wrapper');
+      wrapper.innerHTML = '';
+
+      if (activeBlobUrl) {
+        try { URL.revokeObjectURL(activeBlobUrl); } catch (e) {}
+        activeBlobUrl = null;
+      }
+
+      // buildPlayableHtmlDocument() already resolves this game's ROM bytes (from
+      // memory, disk, or base64) and bakes a ready-to-use blob: URL straight into
+      // the document text above, so there's no separate ROM handoff step needed
+      // here anymore — no postMessage round-trip for the game page to wait on.
+      const fullHtml = await buildPlayableHtmlDocument(game);
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'active-game-iframe';
+      iframe.className = 'w-full h-full border-0 block bg-black';
+      iframe.allow = 'autoplay; fullscreen; gamepad *; microphone; accelerometer; gyroscope; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('allowtransparency', 'true');
+
+      // Prefer srcdoc: a srcdoc iframe inherits the hub's own origin, so a blob:
+      // URL minted here for the ROM (or, offline, for the bundled core files) is
+      // actually fetchable from inside it. iframe.src = blob:<url> navigates the
+      // iframe to a *separate* origin — any blob: URL referenced inside that
+      // document but minted out here fails to fetch from in there with a plain
+      // "Failed to fetch", which is a second, independent way a game can end up
+      // on a black screen even after the ROM-delivery fix above. Only fall back
+      // to the blob: URL route for documents too large for srcdoc to hold (now a
+      // rare case, since ROM bytes are referenced rather than inlined).
+      const useSrcdoc = fullHtml.length < 28 * 1024 * 1024; // ~28 MB practical ceiling
+      try {
+        if (useSrcdoc) {
+          iframe.srcdoc = fullHtml;
+        } else {
+          const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+          activeBlobUrl = URL.createObjectURL(blob);
+          iframe.src = activeBlobUrl;
+        }
+      } catch (err) {
+        console.warn('[Arcadia] srcdoc failed, falling back to blob URL', err);
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        activeBlobUrl = URL.createObjectURL(blob);
+        iframe.src = activeBlobUrl;
+      }
+      wrapper.appendChild(iframe);
+
+      setTimeout(() => {
+        try {
+          iframe.focus();
+          if (iframe.contentWindow) iframe.contentWindow.focus();
+        } catch (e) {}
+      }, 200);
+    }
+
+    function startAutosaveLoop() {
+      stopAutosaveLoop();
+      const sec = Number(hubState.autosaveIntervalSec || 0);
+      if (sec <= 0 || !activePlayingGameId) return;
+      autosaveTimerHandle = setInterval(() => {
+        requestCaptureFromIframe('autosave');
+      }, sec * 1000);
+    }
+
+    function stopAutosaveLoop() {
+      if (autosaveTimerHandle) {
+        clearInterval(autosaveTimerHandle);
+        autosaveTimerHandle = null;
+      }
+    }
+
+    function requestCaptureFromIframe(mode, slotIndex) {
+      const iframe = document.getElementById('active-game-iframe');
+      if (!iframe || !iframe.contentWindow) return;
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'PRISM_CAPTURE_SAVE',
+          mode: mode || 'autosave',
+          slotIndex: slotIndex
+        }, '*');
+      } catch (e) {}
+    }
+
+    function triggerManualAutosaveNow() {
+      requestCaptureFromIframe('autosave');
+      showToast('Updated Rolling Autosave & Native Battery Save!', 'success');
+    }
+
+    async function restartActiveGame() {
+      if (!activePlayingGameId) return;
+      const game = hubState.games.find(g => g.id === activePlayingGameId);
+      if (game) {
+        await mountGameIntoIframe(game);
+        showToast('Rebooted ' + game.title, 'info');
+      }
+    }
+
+    function returnToHub() {
+      stopAutosaveLoop();
+      closePlayerDrawer();
+
+      const wrapper = document.getElementById('iframe-wrapper');
+      const activeIframe = document.getElementById('active-game-iframe');
+      if (activeIframe && activeIframe.contentWindow) {
+        try {
+          activeIframe.contentWindow.postMessage({ type: 'PRISM_HUB_TEARDOWN' }, '*');
+        } catch (e) {}
+      }
+
+      setTimeout(() => {
+        wrapper.innerHTML = '';
+        if (activeBlobUrl) {
+          URL.revokeObjectURL(activeBlobUrl);
+          activeBlobUrl = null;
+        }
+        if (activeRomBlobUrl) {
+          try { URL.revokeObjectURL(activeRomBlobUrl); } catch (e) {}
+          activeRomBlobUrl = null;
+        }
+      }, 120);
+
+      const leavingGame = hubState.games.find(g => g.id === activePlayingGameId);
+      releaseDiskBackedRomBytes(leavingGame);
+      activePlayingGameId = null;
+
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      updateFullscreenUi(false);
+
+      const playerView = document.getElementById('player-view');
+      playerView.classList.add('hidden');
+      playerView.classList.remove('flex');
+      renderAll();
+    }
+
+    // Clean Fullscreen Mode with Auto-Hiding HUD
+    function togglePlayerFullscreen(desiredState) {
+      const playerView = document.getElementById('player-view');
+      const shouldEnter = typeof desiredState === 'boolean' ? desiredState : !document.fullscreenElement;
+      if (shouldEnter) {
+        if (!document.fullscreenElement) {
+          playerView.requestFullscreen().catch(() => {
+            updateFullscreenUi(true);
+          });
+        } else {
+          updateFullscreenUi(true);
+        }
+      } else {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+        updateFullscreenUi(false);
+      }
+    }
+
+    function updateFullscreenUi(isFs) {
+      const playerView = document.getElementById('player-view');
+      const sensor = document.getElementById('fullscreen-top-sensor');
+      const icon = document.getElementById('player-fs-icon');
+      const label = document.getElementById('player-fs-label');
+
+      playerView.classList.toggle('is-fullscreen', isFs);
+      sensor.classList.toggle('hidden', !isFs);
+
+      if (icon) icon.className = isFs ? 'ph-bold ph-corners-in text-sm' : 'ph-bold ph-corners-out text-sm';
+      if (label) label.textContent = isFs ? 'Exit Fullscreen' : 'Fullscreen';
+
+      const iframe = document.getElementById('active-game-iframe');
+      if (iframe && iframe.contentWindow) {
+        try { iframe.contentWindow.postMessage({ type: 'PRISM_FULLSCREEN_SYNC', isFullscreen: isFs }, '*'); } catch (e) {}
+      }
+
+      if (isFs) {
+        revealFullscreenHud();
+      } else {
+        playerView.classList.remove('hud-hidden');
+        if (fullscreenHudTimer) clearTimeout(fullscreenHudTimer);
+      }
+    }
+
+    function revealFullscreenHud() {
+      const playerView = document.getElementById('player-view');
+      if (!playerView.classList.contains('is-fullscreen')) return;
+      playerView.classList.remove('hud-hidden');
+      if (fullscreenHudTimer) clearTimeout(fullscreenHudTimer);
+      fullscreenHudTimer = setTimeout(() => {
+        if (playerView.classList.contains('is-fullscreen') && document.getElementById('player-drawer').classList.contains('hidden')) {
+          playerView.classList.add('hud-hidden');
+        }
+      }, 2400);
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      updateFullscreenUi(Boolean(document.fullscreenElement));
+    });
+
+    // Global Message Listener from Game Iframe
+    window.addEventListener('message', async event => {
+      if (!event.data || !event.data.type) return;
+      const msg = event.data;
+
+      if (msg.type === 'PRISM_REQUEST_ROM') {
+        const game = hubState.games.find(g => g.id === activePlayingGameId);
+        const iframe = document.getElementById('active-game-iframe');
+        if (game && game.isRawRom && iframe && iframe.contentWindow) {
+          const romBytes = await resolveRomBytesAsync(game);
+          if (romBytes && romBytes.length > 0) {
+            iframe.contentWindow.postMessage({
+              type: 'PRISM_INIT_ROM',
+              bytes: romBytes,
+              fileName: game.romName || game.rawFileName || 'game.rom'
+            }, '*');
+          } else {
+            showToast('ROM file data is missing. If using a Library Folder, click Reconnect first.', 'error');
+          }
+        }
+      } else if (msg.type === 'PRISM_GAME_BOOTED') {
+        const game = hubState.games.find(g => g.id === msg.gameId);
+        const iframe = document.getElementById('active-game-iframe');
+        if (game && iframe && iframe.contentWindow) {
+          const rec = getGameSaveRecord(game.id);
+          if (rec.nativeSram && rec.nativeSram.sramB64) {
+            iframe.contentWindow.postMessage({ type: 'PRISM_INJECT_SRAM', sramB64: rec.nativeSram.sramB64 }, '*');
+          }
+          if (pendingBootStatePayload) {
+            const st = pendingBootStatePayload;
+            pendingBootStatePayload = null;
+            setTimeout(() => {
+              iframe.contentWindow.postMessage({ type: 'PRISM_LOAD_STATE', stateB64: st }, '*');
+            }, 350);
+          }
+          syncCheatsToActiveIframe(game.id);
+        }
+      } else if (msg.type === 'PRISM_TOGGLE_FULLSCREEN') {
+        togglePlayerFullscreen(msg.desired);
+      } else if (msg.type === 'PRISM_HUB_RETURN') {
+        returnToHub();
+      } else if (msg.type === 'PRISM_HOTKEY_QUICKSAVE') {
+        requestCaptureFromIframe('slot', 0);
+        showToast('Quick-saved to Slot #1 (F5)', 'success');
+      } else if (msg.type === 'PRISM_HOTKEY_QUICKLOAD' && activePlayingGameId) {
+        const rec = getGameSaveRecord(activePlayingGameId);
+        if (rec.slots[0] && rec.slots[0].stateB64) {
+          loadStateIntoActiveGame(activePlayingGameId, rec.slots[0].stateB64);
+          showToast('Quick-loaded Slot #1 (F8)', 'info');
+        } else {
+          showToast('Slot #1 is empty.', 'error');
+        }
+      } else if ((msg.type === 'PRISM_SAVE_CAPTURED' || msg.type === 'PRISM_FINAL_EXIT_SAVE') && msg.gameId && msg.payload) {
+        const rec = getGameSaveRecord(msg.gameId);
+        const now = Date.now();
+        const { stateB64, sramB64, thumbnail } = msg.payload;
+
+        if (sramB64) {
+          rec.nativeSram = {
+            sramB64,
+            updatedAt: now,
+            sizeBytes: Math.floor((sramB64.length * 3) / 4)
+          };
+        }
+
+        if (msg.mode === 'slot' && typeof msg.slotIndex === 'number') {
+          rec.slots[msg.slotIndex] = {
+            stateB64: stateB64 || sramB64 || '',
+            thumbnail: thumbnail || '',
+            updatedAt: now
+          };
+          showToast('Saved to State Slot #' + (msg.slotIndex + 1), 'success');
+        } else if (stateB64 || sramB64 || thumbnail) {
+          // Single Rolling Autosave overwrites in place per game
+          rec.autosave = {
+            stateB64: stateB64 || (rec.autosave && rec.autosave.stateB64) || '',
+            thumbnail: thumbnail || (rec.autosave && rec.autosave.thumbnail) || '',
+            updatedAt: now
+          };
+          const autoText = document.getElementById('player-autosave-text');
+          if (autoText && activePlayingGameId === msg.gameId) {
+            autoText.textContent = 'Autosaved just now';
+          }
+        }
+
+        await persistGameSaveRecord(msg.gameId, rec);
+        if (activePlayingGameId === msg.gameId && !document.getElementById('player-drawer').classList.contains('hidden')) {
+          renderPlayerDrawerBody();
+        }
+        if (savesModalGameId === msg.gameId) renderSavesModalBody(msg.gameId);
+      }
+    });
+
+    // Global Keyboard Shortcuts
+    window.addEventListener('keydown', e => {
+      if (e.altKey && (e.key === 'm' || e.key === 'M') && activePlayingGameId) {
+        e.preventDefault();
+        returnToHub();
+        return;
+      }
+      if (e.key === 'Escape') {
+        closeSavesModal();
+        closeCheatsModal();
+        closeCoresModal();
+        closeInspectorModal();
+        closeAutosaveSettingsModal();
+        closeEditHubTitleModal();
+        closePlayerDrawer();
+        return;
+      }
+      const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
+      if (isTyping) return;
+
+      if (activePlayingGameId) {
+        if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          togglePlayerFullscreen();
+        } else if (e.key === 'F5') {
+          e.preventDefault();
+          requestCaptureFromIframe('slot', 0);
+          showToast('Quick-saved to Slot #1', 'success');
+        } else if (e.key === 'F8') {
+          e.preventDefault();
+          const rec = getGameSaveRecord(activePlayingGameId);
+          if (rec.slots[0]?.stateB64) loadStateIntoActiveGame(activePlayingGameId, rec.slots[0].stateB64);
+        }
+      } else if (e.key === '/' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        document.getElementById('search-input').focus();
+      }
+    });
+
+    /*************************************************************************
+     * 11. SAVES & CHEATS UI RENDERERS (HUB MODALS & IN-GAME DRAWER)
+     *************************************************************************/
+    function openSavesModal(gameId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      savesModalGameId = gameId;
+      document.getElementById('saves-modal-title').textContent = game.title + ' — Saves';
+      renderSavesModalBody(gameId);
+      document.getElementById('saves-modal').classList.remove('hidden');
+      document.getElementById('saves-modal').classList.add('flex');
+    }
+
+    function closeSavesModal() {
+      savesModalGameId = null;
+      document.getElementById('saves-modal').classList.add('hidden');
+      document.getElementById('saves-modal').classList.remove('flex');
+    }
+
+    function renderSavesModalBody(gameId) {
+      const el = document.getElementById('saves-modal-body');
+      if (el) el.innerHTML = buildSavesManagerHtml(gameId, false);
+    }
+
+    function buildSavesManagerHtml(gameId, isInGame) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return '';
+      const rec = getGameSaveRecord(gameId);
+      const safeId = escapeHtml(gameId);
+
+      const autoCard = rec.autosave
+        ? [
+          '<div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex items-center justify-between gap-3">',
+          '  <div class="flex items-center gap-3 min-w-0">',
+          (rec.autosave.thumbnail
+            ? '<img src="' + rec.autosave.thumbnail + '" class="w-16 h-12 rounded-xl object-cover border border-blue-200 shrink-0">'
+            : '<div class="w-16 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><i class="ph-duotone ph-clock-counter-clockwise text-2xl"></i></div>'),
+          '    <div class="min-w-0">',
+          '      <div class="flex items-center gap-2"><span class="text-xs font-bold text-slate-900">Rolling Autosave</span><span class="px-1.5 py-0.2 rounded bg-blue-600 text-white text-[10px] font-mono">1 Slot</span></div>',
+          '      <div class="text-[11px] text-slate-500 font-mono">Updated ' + formatRelativeTime(rec.autosave.updatedAt) + '</div>',
+          '    </div>',
+          '  </div>',
+          '  <div class="flex items-center gap-1.5 shrink-0">',
+          (rec.autosave.stateB64
+            ? '<button onclick="' + (isInGame ? 'loadStateIntoActiveGame(\'' + safeId + '\', getGameSaveRecord(\'' + safeId + '\').autosave.stateB64)' : 'launchGame(\'' + safeId + '\', getGameSaveRecord(\'' + safeId + '\').autosave.stateB64)') + '" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">Resume</button>'
+            : ''),
+          '    <button onclick="deleteAutosaveSlot(\'' + safeId + '\')" class="p-1.5 rounded-xl bg-white hover:bg-red-50 border border-slate-200 text-slate-500 hover:text-red-600" title="Clear Autosave"><i class="ph-bold ph-trash text-xs"></i></button>',
+          '  </div>',
+          '</div>'
+        ].join('\n')
+        : '<div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center justify-between"><span>No Rolling Autosave captured yet. Plays automatically update this single slot.</span>' + (isInGame ? '<button onclick="triggerManualAutosaveNow()" class="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-semibold">Capture Now</button>' : '') + '</div>';
+
+      const sramHtml = [
+        '<div class="p-4 rounded-2xl bg-white border border-slate-200 flex flex-wrap items-center justify-between gap-3">',
+        '  <div>',
+        '    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5"><i class="ph-duotone ph-cpu text-red-600 text-base"></i> Native Battery Save (.srm / .sav)</div>',
+        '    <div class="text-[11px] text-slate-500 font-mono mt-0.5">' + (rec.nativeSram ? ('Stored (' + formatBytes(rec.nativeSram.sizeBytes) + ') • ' + formatRelativeTime(rec.nativeSram.updatedAt)) : 'Auto-injected on boot once in-game save occurs') + '</div>',
+        '  </div>',
+        '  <div class="flex items-center gap-1.5">',
+        '    <label class="cursor-pointer px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition">',
+        '      Import .srm',
+        '      <input type="file" accept=".srm,.sav,.eep,.fla,.sra" class="hidden" onchange="importNativeSramFile(event, \'' + safeId + '\')">',
+        '    </label>',
+        (rec.nativeSram ? '<button onclick="exportNativeSramFile(\'' + safeId + '\')" class="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold">Export .srm</button>' : ''),
+        '  </div>',
+        '</div>'
+      ].join('\n');
+
+      const slotsHtml = rec.slots.map((slot, i) => {
+        return [
+          '<div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">',
+          '  <div class="flex items-center gap-3 min-w-0">',
+          (slot && slot.thumbnail
+            ? '<img src="' + slot.thumbnail + '" class="w-14 h-10 rounded-lg object-cover border border-slate-200 shrink-0">'
+            : '<div class="w-14 h-10 rounded-lg bg-white border border-slate-200 text-slate-400 font-mono text-xs font-bold flex items-center justify-center shrink-0">#' + (i + 1) + '</div>'),
+          '    <div class="min-w-0">',
+          '      <div class="text-xs font-bold text-slate-900">State Slot #' + (i + 1) + (i === 0 ? ' <span class="text-[10px] font-mono text-blue-600">(F5/F8)</span>' : '') + '</div>',
+          '      <div class="text-[11px] text-slate-500 font-mono">' + (slot ? formatRelativeTime(slot.updatedAt) : 'Empty Slot') + '</div>',
+          '    </div>',
+          '  </div>',
+          '  <div class="flex items-center gap-1.5 shrink-0">',
+          (isInGame ? '<button onclick="requestCaptureFromIframe(\'slot\', ' + i + ')" class="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold">Save</button>' : ''),
+          (slot && slot.stateB64
+            ? '<button onclick="' + (isInGame ? 'loadStateIntoActiveGame(\'' + safeId + '\', getGameSaveRecord(\'' + safeId + '\').slots[' + i + '].stateB64)' : 'launchGame(\'' + safeId + '\', getGameSaveRecord(\'' + safeId + '\').slots[' + i + '].stateB64)') + '" class="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">Load</button>' +
+              '<button onclick="deleteStateSlot(\'' + safeId + '\', ' + i + ')" class="p-1.5 rounded-xl bg-white hover:bg-red-50 border border-slate-200 text-slate-500 hover:text-red-600"><i class="ph-bold ph-trash text-xs"></i></button>'
+            : ''),
+          '  </div>',
+          '</div>'
+        ].join('\n');
+      }).join('\n');
+
+      return [
+        '<div class="space-y-4">',
+        '  <div><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Rolling Autosave</div>' + autoCard + '</div>',
+        '  <div><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Native Battery Memory</div>' + sramHtml + '</div>',
+        '  <div><div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Manual Save State Slots</div><div class="space-y-2">' + slotsHtml + '</div></div>',
+        '</div>'
+      ].join('\n');
+    }
+
+    function loadStateIntoActiveGame(gameId, stateB64) {
+      const iframe = document.getElementById('active-game-iframe');
+      if (iframe && iframe.contentWindow && stateB64) {
+        iframe.contentWindow.postMessage({ type: 'PRISM_LOAD_STATE', stateB64 }, '*');
+        showToast('State restored!', 'success');
+      }
+    }
+
+    async function deleteAutosaveSlot(gameId) {
+      const rec = getGameSaveRecord(gameId);
+      rec.autosave = null;
+      await persistGameSaveRecord(gameId, rec);
+      renderGameBoard();
+      if (savesModalGameId === gameId) renderSavesModalBody(gameId);
+      if (activePlayingGameId === gameId) renderPlayerDrawerBody();
+    }
+
+    async function deleteStateSlot(gameId, idx) {
+      const rec = getGameSaveRecord(gameId);
+      rec.slots[idx] = null;
+      await persistGameSaveRecord(gameId, rec);
+      renderGameBoard();
+      if (savesModalGameId === gameId) renderSavesModalBody(gameId);
+      if (activePlayingGameId === gameId) renderPlayerDrawerBody();
+    }
+
+    async function importNativeSramFile(event, gameId) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const rec = getGameSaveRecord(gameId);
+      rec.nativeSram = {
+        sramB64: encodeBytesToBase64(bytes),
+        updatedAt: Date.now(),
+        sizeBytes: bytes.length
+      };
+      await persistGameSaveRecord(gameId, rec);
+      renderGameBoard();
+      if (savesModalGameId === gameId) renderSavesModalBody(gameId);
+      if (activePlayingGameId === gameId) renderPlayerDrawerBody();
+      showToast('Imported native battery save (' + formatBytes(bytes.length) + ')', 'success');
+    }
+
+    function exportNativeSramFile(gameId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      const rec = getGameSaveRecord(gameId);
+      if (!game || !rec.nativeSram || !rec.nativeSram.sramB64) return;
+      const bytes = decodeBase64ToBytes(rec.nativeSram.sramB64);
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = game.title.replace(/[^a-zA-Z0-9_-]/g, '_') + '.srm';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    // Cheats Modal & Drawer
+    function openCheatsModal(gameId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      cheatsModalGameId = gameId;
+      document.getElementById('cheats-modal-title').textContent = game.title + ' — Cheats';
+      renderCheatsModalBody(gameId);
+      document.getElementById('cheats-modal').classList.remove('hidden');
+      document.getElementById('cheats-modal').classList.add('flex');
+    }
+
+    function closeCheatsModal() {
+      cheatsModalGameId = null;
+      document.getElementById('cheats-modal').classList.add('hidden');
+      document.getElementById('cheats-modal').classList.remove('flex');
+    }
+
+    function renderCheatsModalBody(gameId) {
+      const el = document.getElementById('cheats-modal-body');
+      if (el) el.innerHTML = buildCheatsManagerHtml(gameId, 'modal');
+    }
+
+    function buildCheatsManagerHtml(gameId, prefix) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return '';
+      const cheats = autodetectCheatsForGame(game);
+      const safeId = escapeHtml(gameId);
+      const nameInputId = prefix + '-cheat-name-' + safeId;
+      const codeInputId = prefix + '-cheat-code-' + safeId;
+
+      const listHtml = cheats.map(c => {
+        const safeCheatId = escapeHtml(c.id);
+        return [
+          '<div class="p-3.5 rounded-2xl border ' + (c.enabled ? 'bg-blue-50/70 border-blue-300' : 'bg-white border-slate-200') + ' flex items-center justify-between gap-3 transition">',
+          '  <div class="min-w-0 flex-1">',
+          '    <div class="flex items-center gap-2 flex-wrap">',
+          '      <span class="text-xs font-bold text-slate-900">' + escapeHtml(c.name) + '</span>',
+          '      <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 text-[10px] font-mono">' + escapeHtml(c.source || 'Built-in') + '</span>',
+          '    </div>',
+          '    <div class="text-[11px] font-mono text-slate-500 truncate mt-0.5">' + escapeHtml(c.code.replace(/\n/g, ' + ')) + '</div>',
+          '  </div>',
+          '  <div class="flex items-center gap-2 shrink-0">',
+          '    <button type="button" onclick="toggleGameCheat(\'' + safeId + '\', \'' + safeCheatId + '\')" class="w-11 h-6 rounded-full transition relative ' + (c.enabled ? 'bg-blue-600' : 'bg-slate-300') + '" title="Toggle Cheat">',
+          '      <span class="block w-4 h-4 rounded-full bg-white shadow transition-transform ' + (c.enabled ? 'translate-x-6' : 'translate-x-1') + '"></span>',
+          '    </button>',
+          '    <button type="button" onclick="deleteGameCheat(\'' + safeId + '\', \'' + safeCheatId + '\')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" title="Delete Cheat">',
+          '      <i class="ph-bold ph-trash text-xs"></i>',
+          '    </button>',
+          '  </div>',
+          '</div>'
+        ].join('\n');
+      }).join('\n');
+
+      return [
+        '<div class="space-y-4">',
+        '  <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">',
+        '    <div class="flex items-center justify-between">',
+        '      <span class="text-xs font-bold text-slate-800">Add Custom Cheat Code</span>',
+        '      <label class="cursor-pointer text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">',
+        '        <i class="ph-bold ph-file-arrow-up"></i> Import .cht',
+        '        <input type="file" accept=".cht,.txt" class="hidden" onchange="handleImportChtFile(event, \'' + safeId + '\')">',
+        '      </label>',
+        '    </div>',
+        '    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">',
+        '      <input id="' + nameInputId + '" type="text" placeholder="Cheat name (e.g. Infinite Health)" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-blue-500">',
+        '      <input id="' + codeInputId + '" type="text" placeholder="Code (e.g. 8033B21D 0063)" class="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-500">',
+        '    </div>',
+        '    <button type="button" onclick="addCustomCheatToGame(\'' + safeId + '\', \'' + nameInputId + '\', \'' + codeInputId + '\')" class="w-full py-2 rounded-xl arcadia-btn-primary text-white text-xs font-semibold">Add &amp; Enable Cheat</button>',
+        '  </div>',
+        '  <div class="space-y-2">' + listHtml + '</div>',
+        '</div>'
+      ].join('\n');
+    }
+
+    // In-Game Drawer Controls
+    function togglePlayerDrawer(tab) {
+      const drawer = document.getElementById('player-drawer');
+      if (!drawer.classList.contains('hidden') && currentDrawerTab === tab) {
+        closePlayerDrawer();
+        return;
+      }
+      currentDrawerTab = tab;
+      drawer.classList.remove('hidden');
+      drawer.classList.add('flex');
+      switchDrawerTab(tab);
+      revealFullscreenHud();
+    }
+
+    function closePlayerDrawer() {
+      const drawer = document.getElementById('player-drawer');
+      drawer.classList.add('hidden');
+      drawer.classList.remove('flex');
+    }
+
+    function switchDrawerTab(tab) {
+      currentDrawerTab = tab;
+      const savesBtn = document.getElementById('drawer-tab-saves');
+      const cheatsBtn = document.getElementById('drawer-tab-cheats');
+      savesBtn.className = tab === 'saves'
+        ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-blue-600 text-white'
+        : 'px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100';
+      cheatsBtn.className = tab === 'cheats'
+        ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-red-600 text-white'
+        : 'px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-600 hover:bg-slate-100';
+      renderPlayerDrawerBody();
+    }
+
+    function renderPlayerDrawerBody() {
+      const body = document.getElementById('player-drawer-body');
+      if (!body || !activePlayingGameId) return;
+      if (currentDrawerTab === 'saves') {
+        body.innerHTML = buildSavesManagerHtml(activePlayingGameId, true);
+      } else {
+        body.innerHTML = buildCheatsManagerHtml(activePlayingGameId, 'drawer');
+      }
+    }
+
+    /*************************************************************************
+     * 12. RENDER SELECTION BOARD, FILTERS & MODALS
+     *************************************************************************/
+    function renderAll() {
+      document.getElementById('hub-title-display').textContent = hubState.hubTitle || 'Arcadia';
+      const autoPill = document.getElementById('autosave-interval-pill');
+      if (autoPill) {
+        const sec = Number(hubState.autosaveIntervalSec || 0);
+        autoPill.textContent = sec > 0 ? (sec + 's') : 'Exit';
+      }
+      syncSectionedDomTree();
+      renderStats();
+      renderSystemFilterPills();
+      renderGameBoard();
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatRelativeTime(ts) {
+      if (!ts) return '';
+      const diff = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+      if (diff < 60) return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return new Date(ts).toLocaleDateString();
+    }
+
+    function renderStats() {
+      const totalGames = hubState.games.length;
+      const bundledCores = getBundledSystemsCount();
+      const sharedAssetKeys = Object.keys(hubState.sharedAssets || {});
+      let uniqueSharedBytes = 0;
+      for (const id of sharedAssetKeys) {
+        uniqueSharedBytes += (hubState.sharedAssets[id].size || 0);
+      }
+      let standaloneBytes = 0;
+      for (const g of hubState.games) {
+        if (!g.isPrismVfs) standaloneBytes += (g.totalSize || 0);
+      }
+
+      document.getElementById('stat-games-count').textContent = String(totalGames);
+      document.getElementById('stat-cores-count').textContent = String(bundledCores);
+      document.getElementById('bundled-cores-pill').textContent = String(bundledCores);
+      document.getElementById('stat-shared-assets').textContent = sharedAssetKeys.length + ' files';
+      document.getElementById('stat-total-size').textContent = formatBytes(uniqueSharedBytes + standaloneBytes);
+    }
+
+    function renderSystemFilterPills() {
+      const bar = document.getElementById('system-filter-bar');
+      const counts = { all: hubState.games.length };
+      for (const g of hubState.games) {
+        counts[g.system] = (counts[g.system] || 0) + 1;
+      }
+
+      const pills = [{ id: 'all', label: 'All', count: counts.all, icon: 'ph-squares-four' }];
+      for (const sys of SYSTEMS_DB) {
+        if (counts[sys.id]) {
+          pills.push({ id: sys.id, label: sys.short, count: counts[sys.id], icon: sys.icon });
+        }
+      }
+
+      bar.innerHTML = pills.map(p => {
+        const active = activeFilterSystem === p.id;
+        return '<button onclick="setSystemFilter(\'' + p.id + '\')" class="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 transition ' +
+          (active
+            ? 'arcadia-btn-primary text-white'
+            : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-blue-50/60 border border-slate-200') + '">' +
+          '<i class="ph-bold ' + p.icon + '"></i>' +
+          '<span>' + escapeHtml(p.label) + '</span>' +
+          '<span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono ' + (active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600') + '">' + p.count + '</span>' +
+        '</button>';
+      }).join('');
+    }
+
+    function setSystemFilter(sysId) {
+      activeFilterSystem = sysId;
+      renderSystemFilterPills();
+      renderGameBoard();
+    }
+
+    function setBoardLayout(mode) {
+      boardLayout = mode;
+      const sectionsBtn = document.getElementById('view-sections-btn');
+      const gridBtn = document.getElementById('view-grid-btn');
+      const listBtn = document.getElementById('view-list-btn');
+      const container = document.getElementById('games-container');
+
+      const activeClass = 'p-1.5 rounded-lg bg-blue-600 text-white shadow-sm transition';
+      const inactiveClass = 'p-1.5 rounded-lg text-slate-500 hover:text-slate-900 transition';
+
+      gridBtn.className = mode === 'grid' ? activeClass : inactiveClass;
+      sectionsBtn.className = mode === 'sections' ? activeClass : inactiveClass;
+      listBtn.className = mode === 'list' ? activeClass : inactiveClass;
+
+      if (mode === 'sections') {
+        container.className = 'space-y-8';
+      } else if (mode === 'grid') {
+        container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5';
+      } else {
+        container.className = 'flex flex-col gap-3';
+      }
+      renderGameBoard();
+    }
+
+    function toggleSystemSectionCollapse(sysId) {
+      collapsedSections[sysId] = !collapsedSections[sysId];
+      renderGameBoard();
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      renderGameBoard();
+    }
+
+    function renderGameBoard() {
+      const container = document.getElementById('games-container');
+      const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
+      const sortBy = document.getElementById('sort-select').value;
+
+      document.getElementById('clear-search-btn').classList.toggle('hidden', !query);
+
+      if (hubState.games.length === 0) {
+        container.className = 'grid grid-cols-1';
+        container.innerHTML = [
+          '<div class="py-20 text-center arcadia-glass rounded-3xl p-8 max-w-2xl mx-auto">',
+          '  <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-red-50 border border-blue-200 flex items-center justify-center mx-auto mb-4 text-blue-600">',
+          '    <i class="ph-duotone ph-game-controller text-3xl"></i>',
+          '  </div>',
+          '  <h3 class="text-xl font-display font-bold text-slate-900 mb-1.5">Your Arcadia Library is Empty</h3>',
+          '  <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-6">Drag and drop standalone Prism HTML games or raw ROM files anywhere on this window, or click below to browse your files.</p>',
+          '  <div class="flex flex-wrap items-center justify-center gap-3">',
+          '    <button onclick="document.getElementById(\'file-upload-input\').click()" class="arcadia-btn-primary px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white inline-flex items-center gap-2">',
+          '      <i class="ph-bold ph-plus-circle text-base"></i>',
+          '      <span>Add Games (HTML / ROMs)</span>',
+          '    </button>',
+          '    <button onclick="openCoresModal()" class="px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 inline-flex items-center gap-2">',
+          '      <i class="ph-duotone ph-cpu text-blue-600 text-base"></i>',
+          '      <span>Pre-Bundle Emulator Cores</span>',
+          '    </button>',
+          '  </div>',
+          '</div>'
+        ].join('\n');
+        return;
+      }
+
+      if (boardLayout === 'grid') container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5';
+      else if (boardLayout === 'sections') container.className = 'space-y-8';
+      else container.className = 'flex flex-col gap-3';
+
+      let filtered = hubState.games.filter(g => {
+        if (activeFilterSystem !== 'all' && g.system !== activeFilterSystem) return false;
+        if (query) {
+          const sys = getSystemMeta(g.system);
+          const hay = (g.title + ' ' + g.rawFileName + ' ' + g.romName + ' ' + g.core + ' ' + sys.name + ' ' + sys.short).toLowerCase();
+          return hay.includes(query);
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (sortBy === 'alpha') return a.title.localeCompare(b.title);
+        if (sortBy === 'system') return a.system.localeCompare(b.system);
+        if (sortBy === 'size') return (b.totalSize || 0) - (a.totalSize || 0);
+        return (b.addedAt || 0) - (a.addedAt || 0);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = [
+          '<div class="col-span-full py-14 text-center arcadia-glass rounded-3xl p-8">',
+          '  <h3 class="text-base font-display font-bold text-slate-900 mb-1">No Games Match Your Filter</h3>',
+          '  <p class="text-xs text-slate-500 mb-4">Clear your search query or switch system filters.</p>',
+          '  <button onclick="setSystemFilter(\'all\'); clearSearch();" class="arcadia-btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white">Reset Filters</button>',
+          '</div>'
+        ].join('\n');
+        return;
+      }
+
+      if (boardLayout === 'sections') {
+        const grouped = {};
+        filtered.forEach(g => {
+          if (!grouped[g.system]) grouped[g.system] = [];
+          grouped[g.system].push(g);
+        });
+
+        const orderedSystems = SYSTEMS_DB.filter(sys => grouped[sys.id] && grouped[sys.id].length > 0);
+        container.innerHTML = orderedSystems.map(sys => {
+          const sysGames = grouped[sys.id];
+          const isCollapsed = !!collapsedSections[sys.id];
+          return [
+            '<section class="arcadia-glass rounded-3xl p-5">',
+            '  <div class="flex items-center justify-between gap-3 ' + (isCollapsed ? '' : 'pb-4 border-b border-slate-200 mb-5') + '">',
+            '    <div class="flex items-center gap-3 cursor-pointer" onclick="toggleSystemSectionCollapse(\'' + sys.id + '\')">',
+            '      <div class="w-10 h-10 rounded-xl bg-gradient-to-br ' + sys.accent + ' flex items-center justify-center text-white shadow-sm">',
+            '        <i class="ph-duotone ' + sys.icon + ' text-xl"></i>',
+            '      </div>',
+            '      <div>',
+            '        <div class="flex items-center gap-2">',
+            '          <h2 class="text-base font-display font-bold text-slate-900">' + escapeHtml(sys.name) + '</h2>',
+            '          <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">' + sysGames.length + '</span>',
+            '        </div>',
+            '        <div class="text-xs text-slate-500 font-mono">Core: ' + escapeHtml(sys.cores[0]) + '</div>',
+            '      </div>',
+            '    </div>',
+            '    <button onclick="toggleSystemSectionCollapse(\'' + sys.id + '\')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">',
+            '      <i class="ph-bold ' + (isCollapsed ? 'ph-caret-down' : 'ph-caret-up') + ' text-xs"></i>',
+            '    </button>',
+            '  </div>',
+            (isCollapsed ? '' : '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">' + sysGames.map(g => renderGridCard(g)).join('') + '</div>'),
+            '</section>'
+          ].join('\n');
+        }).join('');
+      } else if (boardLayout === 'grid') {
+        container.innerHTML = filtered.map(g => renderGridCard(g)).join('');
+      } else {
+        container.innerHTML = filtered.map(g => renderListRow(g)).join('');
+      }
+    }
+
+    function renderGridCard(game) {
+      const sys = getSystemMeta(game.system);
+      const safeId = escapeHtml(game.id);
+      const hasSave = hasAnySaveData(game.id);
+      const activeCheats = getEnabledCheatsCount(game.id);
+
+      return [
+        '<div class="arcadia-card rounded-2xl overflow-hidden flex flex-col justify-between group">',
+        '  <div onclick="launchGame(\'' + safeId + '\')" class="h-36 relative overflow-hidden cursor-pointer bg-gradient-to-br ' + sys.accent + ' p-4 flex flex-col justify-between">',
+        (game.coverUrl ? '<img src="' + escapeHtml(game.coverUrl) + '" alt="' + escapeHtml(game.title) + '" class="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:scale-105 transition duration-300" onerror="this.style.display=\'none\'">' : ''),
+        '    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent"></div>',
+        '    <div class="relative z-10 flex items-center justify-between gap-2">',
+        '      <span class="px-2.5 py-0.5 rounded-lg bg-white/95 text-slate-900 text-[11px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">',
+        '        <i class="ph-fill ' + sys.icon + ' text-blue-600"></i>',
+        '        ' + escapeHtml(sys.short),
+        '      </span>',
+        '      <div class="flex items-center gap-1">',
+        (hasSave ? '<span class="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-mono font-bold shadow-sm">Saved</span>' : ''),
+        (activeCheats > 0 ? '<span class="px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-mono font-bold shadow-sm">' + activeCheats + ' Cheat' + (activeCheats > 1 ? 's' : '') + '</span>' : ''),
+        '      </div>',
+        '    </div>',
+        '    <div class="relative z-10 flex items-end justify-between gap-2">',
+        '      <div class="min-w-0">',
+        '        <h3 class="text-base font-display font-bold text-white leading-snug line-clamp-2 drop-shadow">' + escapeHtml(game.title) + '</h3>',
+        '        <p class="text-[11px] font-mono text-slate-200/90 truncate">' + escapeHtml(game.core) + ' • ' + formatBytes(game.totalSize) + '</p>',
+        '      </div>',
+        '      <div class="w-9 h-9 rounded-xl bg-white text-blue-600 group-hover:bg-red-600 group-hover:text-white flex items-center justify-center shrink-0 transition shadow-md">',
+        '        <i class="ph-fill ph-play text-base"></i>',
+        '      </div>',
+        '    </div>',
+        '  </div>',
+        '  <div class="p-3 bg-white flex items-center justify-between gap-1.5 border-t border-slate-100">',
+        '    <button onclick="launchGame(\'' + safeId + '\')" class="flex-1 arcadia-btn-primary py-2 px-3 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5">',
+        '      <i class="ph-fill ph-play text-xs"></i>',
+        '      <span>Play</span>',
+        '    </button>',
+        '    <button onclick="openSavesModal(\'' + safeId + '\')" class="px-2.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1 transition" title="Autosave, SRAM & Save States">',
+        '      <i class="ph-bold ph-floppy-disk text-sm"></i>',
+        '    </button>',
+        '    <button onclick="openCheatsModal(\'' + safeId + '\')" class="px-2.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold flex items-center gap-1 transition" title="Cheats & Toggles">',
+        '      <i class="ph-bold ph-magic-wand text-sm"></i>',
+        '    </button>',
+        '    <button onclick="openInspectorModal(\'' + safeId + '\')" class="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Configure Game">',
+        '      <i class="ph-bold ph-sliders-horizontal text-sm"></i>',
+        '    </button>',
+        '  </div>',
+        '</div>'
+      ].join('\n');
+    }
+
+    function renderListRow(game) {
+      const sys = getSystemMeta(game.system);
+      const safeId = escapeHtml(game.id);
+      const hasSave = hasAnySaveData(game.id);
+      const activeCheats = getEnabledCheatsCount(game.id);
+
+      return [
+        '<div class="arcadia-card rounded-2xl p-3.5 sm:px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">',
+        '  <div onclick="launchGame(\'' + safeId + '\')" class="flex items-center gap-3.5 cursor-pointer min-w-0 flex-1">',
+        '    <div class="w-11 h-11 rounded-xl bg-gradient-to-br ' + sys.accent + ' flex items-center justify-center text-white shrink-0 shadow-sm">',
+        '      <i class="ph-duotone ' + sys.icon + ' text-xl"></i>',
+        '    </div>',
+        '    <div class="min-w-0 flex-1">',
+        '      <div class="flex items-center gap-2 flex-wrap">',
+        '        <h3 class="text-sm sm:text-base font-display font-bold text-slate-900 truncate">' + escapeHtml(game.title) + '</h3>',
+        '        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">' + escapeHtml(sys.short) + '</span>',
+        (hasSave ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600 text-white">Saved</span>' : ''),
+        (activeCheats > 0 ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-600 text-white">' + activeCheats + ' Cheats</span>' : ''),
+        '      </div>',
+        '      <div class="text-xs text-slate-500 font-mono truncate mt-0.5">' + escapeHtml(game.core) + ' • ' + formatBytes(game.totalSize) + '</div>',
+        '    </div>',
+        '  </div>',
+        '  <div class="flex items-center gap-2 self-end sm:self-center shrink-0">',
+        '    <button onclick="openSavesModal(\'' + safeId + '\')" class="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-floppy-disk"></i><span>Saves</span></button>',
+        '    <button onclick="openCheatsModal(\'' + safeId + '\')" class="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-magic-wand"></i><span>Cheats</span></button>',
+        '    <button onclick="openInspectorModal(\'' + safeId + '\')" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"><i class="ph-bold ph-sliders-horizontal"></i></button>',
+        '    <button onclick="launchGame(\'' + safeId + '\')" class="arcadia-btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5"><i class="ph-fill ph-play"></i><span>Play</span></button>',
+        '  </div>',
+        '</div>'
+      ].join('\n');
+    }
+
+    // Cores Modal
+    function openCoresModal() {
+      document.getElementById('keep-unused-cores-checkbox').checked = hubState.keepUnusedCoresOnExport !== false;
+      renderCoresModalGrid();
+      document.getElementById('cores-modal').classList.remove('hidden');
+      document.getElementById('cores-modal').classList.add('flex');
+    }
+
+    function closeCoresModal() {
+      document.getElementById('cores-modal').classList.add('hidden');
+      document.getElementById('cores-modal').classList.remove('flex');
+    }
+
+    function renderCoresModalGrid() {
+      const grid = document.getElementById('cores-modal-grid');
+      const summary = document.getElementById('cores-modal-summary');
+      const consoleSystems = SYSTEMS_DB.filter(s => s.id !== 'html5');
+      const bundledCount = getBundledSystemsCount();
+      if (summary) summary.textContent = bundledCount + ' / ' + consoleSystems.length + ' Systems Bundled';
+
+      grid.innerHTML = consoleSystems.map(sys => {
+        const coreName = sys.cores[0];
+        const bundled = isCoreBundled(coreName);
+        return [
+          '<div class="p-3.5 rounded-2xl border ' + (bundled ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200') + ' flex items-center justify-between gap-2.5">',
+          '  <div class="flex items-center gap-2.5 min-w-0">',
+          '    <div class="w-9 h-9 rounded-xl bg-gradient-to-br ' + sys.accent + ' flex items-center justify-center text-white shrink-0">',
+          '      <i class="ph-duotone ' + sys.icon + ' text-lg"></i>',
+          '    </div>',
+          '    <div class="min-w-0">',
+          '      <div class="text-xs font-display font-bold text-slate-900 truncate">' + escapeHtml(sys.short) + ' <span class="font-sans font-normal text-slate-500">(' + escapeHtml(sys.name) + ')</span></div>',
+          '      <div class="text-[11px] font-mono text-slate-500 truncate">' + escapeHtml(coreName) + '</div>',
+          '    </div>',
+          '  </div>',
+          bundled
+            ? '<span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-semibold shrink-0 flex items-center gap-1"><i class="ph-bold ph-check"></i> Bundled</span>'
+            : '<button onclick="bundleCoreForSystem(\'' + sys.id + '\')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white text-[11px] font-semibold shrink-0 transition">+ Bundle Core</button>',
+          '</div>'
+        ].join('\n');
+      }).join('');
+    }
+
+    // Inspector Modal
+    function populateInspectorCoreOptions(sysId, currentCore) {
+      const sys = getSystemMeta(sysId);
+      const coreSelect = document.getElementById('inspector-core-select');
+      const options = [...sys.cores];
+      if (currentCore && !options.includes(currentCore)) options.unshift(currentCore);
+      coreSelect.innerHTML = options.map(c =>
+        '<option value="' + escapeHtml(c) + '" ' + (c === currentCore ? 'selected' : '') + '>' + escapeHtml(c) + '</option>'
+      ).join('');
+    }
+
+    function onInspectorSystemChange() {
+      const sysId = document.getElementById('inspector-system-select').value;
+      populateInspectorCoreOptions(sysId, getSystemMeta(sysId).cores[0]);
+    }
+
+    function handleCoverImageUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 480;
+          const scale = Math.min(1, maxW / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          document.getElementById('inspector-cover-input').value = canvas.toDataURL('image/webp', 0.82);
+          showToast('Cover art attached!', 'success');
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openInspectorModal(gameId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      inspectingGameId = gameId;
+
+      document.getElementById('inspector-title').textContent = 'Configure — ' + game.title;
+      document.getElementById('inspector-title-input').value = game.title;
+      document.getElementById('inspector-cover-input').value = game.coverUrl || '';
+
+      const sysSelect = document.getElementById('inspector-system-select');
+      sysSelect.innerHTML = SYSTEMS_DB.map(s =>
+        '<option value="' + s.id + '" ' + (s.id === game.system ? 'selected' : '') + '>' + escapeHtml(s.name) + ' (' + escapeHtml(s.short) + ')</option>'
+      ).join('');
+      populateInspectorCoreOptions(game.system, game.core);
+
+      const vfsList = document.getElementById('inspector-vfs-list');
+      const entries = Object.entries(game.vfsManifest || {});
+      document.getElementById('inspector-vfs-summary').textContent = entries.length ? (entries.length + ' files') : 'Standalone / Raw ROM';
+      vfsList.innerHTML = entries.length === 0
+        ? '<div class="p-3.5 text-xs text-slate-500 text-center">No separate VFS manifest entries.</div>'
+        : entries.map(([key, info]) =>
+          '<div class="px-3.5 py-2 flex items-center justify-between text-xs font-mono"><span class="text-slate-800 truncate">' + escapeHtml(key) + '</span><span class="text-slate-500">' + formatBytes(info.size) + '</span></div>'
+        ).join('');
+
+      document.getElementById('inspector-modal').classList.remove('hidden');
+      document.getElementById('inspector-modal').classList.add('flex');
+    }
+
+    function closeInspectorModal() {
+      inspectingGameId = null;
+      document.getElementById('inspector-modal').classList.add('hidden');
+      document.getElementById('inspector-modal').classList.remove('flex');
+    }
+
+    async function saveInspectorChanges() {
+      if (!inspectingGameId) return;
+      const game = hubState.games.find(g => g.id === inspectingGameId);
+      if (!game) return;
+      const newTitle = document.getElementById('inspector-title-input').value.trim();
+      if (newTitle) game.title = newTitle;
+      game.system = document.getElementById('inspector-system-select').value;
+      game.core = document.getElementById('inspector-core-select').value;
+      game.coverUrl = document.getElementById('inspector-cover-input').value.trim();
+      closeInspectorModal();
+      renderAll();
+      if (libraryDirHandle) await saveLibraryJsonToFolder();
+      showToast('Updated "' + game.title + '".', 'success');
+    }
+
+    async function deleteInspectedGame() {
+      if (!inspectingGameId) return;
+      const idx = hubState.games.findIndex(g => g.id === inspectingGameId);
+      if (idx !== -1) {
+        const removed = hubState.games.splice(idx, 1)[0];
+        pruneOrphanedSharedAssets();
+        if (removed.romDiskFile && romsDirHandle) {
+          await removeRomFileFromDisk(removed.romDiskFile);
+        }
+        closeInspectorModal();
+        renderAll();
+        if (libraryDirHandle) await saveLibraryJsonToFolder();
+        showToast('Removed "' + removed.title + '".', 'info');
+      }
+    }
+
+    // Autosave Settings & Rename Modals
+    function openAutosaveSettingsModal() {
+      document.getElementById('autosave-interval-select').value = String(hubState.autosaveIntervalSec ?? 45);
+      document.getElementById('autosave-modal').classList.remove('hidden');
+      document.getElementById('autosave-modal').classList.add('flex');
+    }
+
+    function closeAutosaveSettingsModal() {
+      document.getElementById('autosave-modal').classList.add('hidden');
+      document.getElementById('autosave-modal').classList.remove('flex');
+    }
+
+    async function saveAutosaveSettings() {
+      hubState.autosaveIntervalSec = Number(document.getElementById('autosave-interval-select').value);
+      closeAutosaveSettingsModal();
+      renderAll();
+      if (activePlayingGameId) startAutosaveLoop();
+      if (libraryDirHandle) await saveLibraryJsonToFolder();
+      showToast('Autosave interval updated!', 'success');
+    }
+
+    function openEditHubTitleModal() {
+      document.getElementById('hub-name-input').value = hubState.hubTitle || 'Arcadia';
+      document.getElementById('hub-name-modal').classList.remove('hidden');
+      document.getElementById('hub-name-modal').classList.add('flex');
+    }
+
+    function closeEditHubTitleModal() {
+      document.getElementById('hub-name-modal').classList.add('hidden');
+      document.getElementById('hub-name-modal').classList.remove('flex');
+    }
+
+    async function saveHubTitle() {
+      const val = document.getElementById('hub-name-input').value.trim();
+      if (val) {
+        hubState.hubTitle = val;
+        renderAll();
+        if (libraryDirHandle) await saveLibraryJsonToFolder();
+        showToast('Hub title updated!', 'success');
+      }
+      closeEditHubTitleModal();
+    }
+
+    /*************************************************************************
+     * 13. SINGLE-FILE COMBINED HTML EXPORTER
+     *************************************************************************/
+    function getExportableGames() {
+      return hubState.games.map(g => {
+        if (g.romBytes || g.romBase64) {
+          const clone = Object.assign({}, g);
+          clone.romBase64 = g.romBase64 || encodeBytesToBase64(g.romBytes);
+          delete clone.romBytes;
+          return clone;
+        }
+        return g;
+      });
+    }
+
+    async function exportCombinedHub() {
+      if (libraryDirHandle) {
+        try {
+          await saveLibraryJsonToFolder();
+          showToast('Saved library.json to folder (' + hubState.games.length + ' games).', 'success');
+        } catch (err) {
+          showToast('Failed to save library folder.', 'error');
+        }
+        return;
+      }
+
+      try {
+        pruneOrphanedSharedAssets();
+        syncSectionedDomTree();
+        const exportableState = Object.assign({}, hubState, {
+          version: '1.2',
+          games: getExportableGames()
+        });
+        const serializedBundle = JSON.stringify(exportableState).replace(/<\/script>/gi, '<\\/script>');
+
+        const docClone = document.documentElement.cloneNode(true);
+        ['games-container', 'toast-container', 'iframe-wrapper', 'system-filter-bar', 'cores-modal-grid', 'saves-modal-body', 'cheats-modal-body', 'player-drawer-body'].forEach(id => {
+          const el = docClone.querySelector('#' + id);
+          if (el) el.innerHTML = '';
+        });
+        ['drop-overlay', 'player-view', 'saves-modal', 'cheats-modal', 'cores-modal', 'inspector-modal', 'autosave-modal', 'hub-name-modal', 'player-drawer'].forEach(id => {
+          const el = docClone.querySelector('#' + id);
+          if (el) {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+          }
+        });
+        const bundleEl = docClone.querySelector('#prism-hub-bundle');
+        if (bundleEl) {
+          bundleEl.textContent = '\n' + serializedBundle + '\n';
+        }
+
+        const currentDoc = '<!DOCTYPE html>\n' + docClone.outerHTML;
+        const blob = new Blob([currentDoc], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const safeName = (hubState.hubTitle || 'Arcadia').replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.href = url;
+        a.download = safeName + '_V1.2_' + hubState.games.length + '_Games.html';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2500);
+
+        showToast('Exported Arcadia V1.2 HTML (' + hubState.games.length + ' games, ' + getBundledSystemsCount() + ' bundled cores)!', 'success');
+      } catch (err) {
+        console.error('Export failed:', err);
+        showToast('Export failed. For huge ROM libraries, connect a Library Folder.', 'error');
+      }
+    }
+
+    async function exportSingleGame(gameId) {
+      const game = hubState.games.find(g => g.id === gameId);
+      if (!game) return;
+      const html = await buildPlayableHtmlDocument(game, { forExport: true });
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = game.rawFileName.endsWith('.html') ? game.rawFileName : (game.title + '.html');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2500);
+      showToast('Exported standalone "' + game.title + '.html"', 'success');
+    }
+
+    /*************************************************************************
+     * 14. UTILITIES & TOAST NOTIFICATIONS
+     *************************************************************************/
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, type) {
+      type = type || 'info';
+      const container = document.getElementById('toast-container');
+      const colors = {
+        success: 'border-blue-300 bg-white text-slate-900 shadow-blue-900/10',
+        error: 'border-red-300 bg-white text-red-900 shadow-red-900/10',
+        info: 'border-slate-200 bg-white text-slate-800 shadow-slate-900/10'
+      };
+      const icons = {
+        success: 'ph-check-circle text-blue-600',
+        error: 'ph-warning-circle text-red-600',
+        info: 'ph-sparkle text-blue-600'
+      };
+
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-xl text-xs font-semibold transition-all duration-300 ' + (colors[type] || colors.info);
+      toast.innerHTML = '<i class="ph-fill ' + (icons[type] || icons.info) + ' text-lg shrink-0"></i><span class="flex-1">' + escapeHtml(message) + '</span>';
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3400);
+    }
+
+    window.onload = async function() {
+      await tryRestoreLibraryFolder();
+      if (!libraryDirHandle) {
+        loadEmbeddedBundle();
+      }
+      await loadAllPersistedSaves();
+      renderAll();
+    };
+  </script>
+</body>
+</html>
